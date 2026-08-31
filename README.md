@@ -131,7 +131,7 @@ declined ones, which is what makes result 3 measurable at all.
 
 ## Related work
 
-[](RELATED_WORK.md) positions this against four literatures — betting market
+[`RELATED_WORK.md`](RELATED_WORK.md) positions this against four literatures — betting market
 efficiency, selection and reject inference, A/B experiment quality monitoring, and ML data
 validation — and marks which sources were read during the pass versus cited from background. It is
 explicit about what is *not* novel here: selection bias, MNAR and reject inference are established,
