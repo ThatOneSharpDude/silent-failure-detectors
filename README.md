@@ -129,6 +129,40 @@ declined ones, which is what makes result 3 measurable at all.
 
 ---
 
+## A third domain: what a name fails to identify
+
+Result 2 is the paper's least independently checkable claim, because the 51.7% figure lives in a
+private store. The Chadwick Bureau register — a free third-party crosswalk between the player IDs
+used by MLBAM, Retrosheet, Baseball-Reference and FanGraphs — lets anyone measure one component of
+the same mechanism. It exists *because* name-keying does not work, which makes its existence part
+of the evidence.
+
+```bash
+py datasets/chadwick/fetch_chadwick.py   # once, needs network (~65MB)
+py run_detectors_identity.py             # offline thereafter
+```
+
+| population | ambiguous names | people affected |
+|---|---|---|
+| whole register (518,743 people) | 9.19% | **23.61%** |
+| anyone with an MLBAM id | 6.32% | 15.29% |
+| MLB, played 2015 or later | 0.55% | **1.19%** |
+
+Among current players the collision rate is about 1% — real (`jose fernandez` x4, `luis garcia` x3,
+`will smith` x2) but not a crisis. The larger surface is normalisation: **10.3% of active players
+carry a diacritic**, and a collision needs two people to exist while a normalisation difference needs
+only one writer to fold accents and another not to. This project shipped that exact bug — a
+transaction check missed *Márquez* because it compared against *marquez*.
+
+**What this does not do.** It does not corroborate the 51.7% figure and is not offered as if it did.
+That failure was driven mainly by *other* mutable fields in the identity key — a market string
+respelled between writers, a line arriving as `None` on one path and `0.0` on another — with name
+handling only one contributor. This measures one component, on a different population, and it comes
+out an order of magnitude smaller. The claim it supports is that the mechanism is real and publicly
+measurable, not that its size here validates ours.
+
+---
+
 ## Related work
 
 [`RELATED_WORK.md`](RELATED_WORK.md) positions this against four literatures — betting market
