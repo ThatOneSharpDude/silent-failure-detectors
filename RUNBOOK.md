@@ -77,10 +77,18 @@ capture-failure count. Two should NOT move:
 ## 3. Check the word count
 
 ```bash
-py -c "import io,re;print(len(re.findall(r'\S+', io.open('SSAC_ABSTRACT_final.md',encoding='utf-8').read())))"
+py -c "import io,re;t=io.open('SSAC_ABSTRACT_final.md',encoding='utf-8').read();w=lambda s:len(re.findall(r'[A-Za-z0-9][^\s]*',s));L=t.splitlines();print('with table   :',w(t));print('without table:',w(chr(10).join(l for l in L if not l.strip().startswith('|'))))"
 ```
 
-Limit is 500. Trim, do not append.
+Limit is 500 **including the title**. Judge it on the *with table* number — that is the strict
+reading, and it currently sits at 499.
+
+Do not use a bare `\S+` word count here. It counts `#`, `##` and the table's `|` separators as
+words and reports 522 on an abstract that is actually compliant — which would send you trimming
+good sentences to fix a problem that does not exist. The command above counts only tokens that
+start with a letter or digit.
+
+Trim, do not append.
 
 ## 4. Sanity pass
 
