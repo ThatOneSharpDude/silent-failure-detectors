@@ -107,6 +107,8 @@ evidence. The betting system here violated both rules and could not measure itse
 Federal mortgage reporting converged on both rules without reference to this work. That is the
 argument that these are properties of self-evaluating systems rather than lessons from one pipeline.
 
+---
+
 ## What is in `data/`, and what is deliberately not
 
 Shipped: day index, sport, market class, whether the system acted, whether a close existed, whether
