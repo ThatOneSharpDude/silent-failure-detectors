@@ -77,6 +77,36 @@ betting — they belong to any pipeline judged on data it generated itself.
 
 ---
 
+## The same detectors on federal mortgage data
+
+Every result above comes from one operator's own pipeline, which makes *"you found three bugs in
+your own system"* a fair objection. So the detectors are also run, unmodified, against the **HMDA
+Loan Application Register** — mortgage applications collected under federal mandate from thousands
+of institutions with no connection to this work.
+
+```bash
+py datasets/hmda/fetch_hmda.py   # once, needs network (~17MB)
+py run_detectors_hmda.py         # offline thereafter
+```
+
+Delaware 2023: 44,128 applications, of which 21,889 (49.6%) were originated. The rest is the
+population the lenders did not write.
+
+**An interest rate is recorded on 96.3% of originated loans and 0.0% of denied ones.** Coverage
+differs across decision strata by 99.7 percentage points. This is not a data-quality defect to be
+cleaned — the counterfactual rate does not exist, and the reporting standard concedes as much by
+defining the field as not applicable unless the loan was originated. It is the same shape as a
+closing price that stops existing once the market moves away from the rung you took.
+
+The more useful result is what comes back **clean**. Rule 1 passes because HMDA *requires* a denied
+application to be retained with the reason it was denied — which is the only reason the coverage
+figure above is computable. Rule 3 is satisfied structurally, because the decision is a stored field
+rather than something a reader re-derives, so it is not run at all: a check that cannot fail is not
+evidence. The betting system here violated both rules and could not measure itself as a result.
+
+Federal mortgage reporting converged on both rules without reference to this work. That is the
+argument that these are properties of self-evaluating systems rather than lessons from one pipeline.
+
 ## What is in `data/`, and what is deliberately not
 
 Shipped: day index, sport, market class, whether the system acted, whether a close existed, whether
