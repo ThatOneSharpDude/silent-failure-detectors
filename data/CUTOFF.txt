@@ -1,0 +1,3 @@
+All data frozen at 2026-08-24 (45 pricing days).
+Day indices are RELATIVE (day 0 = first day in window) and carry no calendar alignment.
+The salt is generated per run and discarded; tokens cannot be inverted.
