@@ -8,9 +8,74 @@ This repository is the record of such failures on a live sports betting book, ev
 paper regenerated from the shipped data, and four detectors that would have caught them, run
 unmodified on federal mortgage data and clinical trial registration as well.
 
-The claim is not that a model beat a market. Neither return figure here is distinguishable from
-zero. The claim is about **measurement**: each failure below left every dashboard green, and two of
-them made the system look *better* the worse they got.
+The claim is not that a model beat a market. No return figure here is offered as evidence of edge.
+The claim is about **measurement**: each failure below left every dashboard green, and two of them
+made the system look *better* the worse they got.
+
+---
+
+## In plain English
+
+**The one idea:** a system can only grade what it recorded. What it failed to record decides what its
+numbers say, and it will never tell you. In every case below, no number looked *bad*. The numbers
+looked fine because the damage was in rows that were missing, dropped, or never written down. A
+dashboard can show you a wrong number. It cannot show you a number that is not there.
+
+**The betting version.** Bettors judge skill with closing line value (CLV): did you get a better
+price than the market's final one? But on player props, books often pull a line before the game
+starts, so there is no closing price and no CLV for that bet. Here, 25% of prop positions had no
+closing price, and 41% of the bets actually taken. Lines disappear when the market moves away from
+your number, so the bets you cannot grade tend to be the ones that went wrong, and the average is
+taken over the easy cases. Collecting more data does not help: in 139,061 logged failures, the line
+that was bet was still being offered zero times. The price did not get missed. It stopped existing.
+
+**Three more things that broke without anyone noticing:**
+
+1. **The population changed underneath the number.** For its first 12 days the system only saved
+   the bets it placed, not the ones it passed on. Measured over everything, its picks look +2.19%.
+   Measured only over days when both were saved, they look -0.94%. Nothing in any report says the
+   population changed.
+2. **A filter that could never pass.** A filter demanded a bigger edge than the model is allowed to
+   output. For 16 days, 0 of 914 positions in what the system rated its best segment could become a
+   bet. No error. It was an off switch that looked like a filter.
+3. **A fair coin nobody can check.** A randomised test flipped a reproducible coin for each bet so
+   nobody could quietly re-flip it until they liked the answer. But the coin was keyed on data that
+   different parts of the code spell differently. Re-flipping each stored bet now matches its
+   recorded side only 47-49% of the time, which is what a brand-new coin would do. The two sides
+   look perfectly balanced, and the test still cannot prove it was fair.
+
+**It is not a betting problem.** Run unchanged on federal mortgage data, the same detectors find an
+interest rate on 96.3% of approved loans and 0% of denied ones. On clinical trial registration,
+results are posted for 24.3% of completed trials and 0% of withdrawn ones. Those regulators *require*
+the rejected cases to be kept, which is the only reason the gap is visible at all.
+
+### What this fixes in your own model
+
+It does not make anyone's model more accurate. It stops you believing wrong things about your model,
+and in betting a wrong belief costs money: you size up on an edge that is not there, or kill one that
+is. It fixes the scoreboard, not the prediction.
+
+| If you... | You probably think... | Ask instead... |
+|---|---|---|
+| track CLV | "my average CLV is positive, so I have an edge" | what share of my bets even have a close, and is it lower on my losers? |
+| use a filter to pick bets | "the bets I placed won, so the filter works" | did I save the bets I passed on, and how did they do? |
+| run an A/B test | "the arms are 50/50, so the test is fair" | can I re-derive each unit's assignment from its record and get the same answer? |
+| have thresholds or caps | "no errors, so everything ran" | can this threshold actually be reached? |
+
+### The four questions, and the detector for each
+
+1. **What did I delete?** Keep and flag anything you filter out, or it can never be counted.
+   (`demote_never_delete`)
+2. **Is it actually empty?** A file that loads can still hold nothing. Check the counts.
+   (`assert_nonzero`)
+3. **Did I record the decision, or am I recomputing it?** Recomputing later audits today's code, not
+   what happened. (`record_the_decision`)
+4. **What is my number not seeing, and does that depend on my own choices?** Put coverage next to
+   every average. (`monitor_for_absence`)
+
+Most model builders spend their effort making predictions better. The cheaper, bigger win is often
+making sure you can trust the scoreboard. A better model on a broken scoreboard still leaves you
+guessing. An honest scoreboard makes even a mediocre model tell the truth about itself.
 
 ---
 
