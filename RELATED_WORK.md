@@ -87,11 +87,11 @@ have the expected proportions and whether the assigned populations are statistic
 not ask whether a *given unit* would receive the same assignment if the assignment were derived
 again.
 
-Our failure passes both. The arms were balanced 353 to 350 across nine days — an SRM test would have
+Our failure passes both. The arms were balanced 591 to 572 across nine days — an SRM test would have
 returned clean, and a PSI check on the arm populations would have found them stable, because the
-imbalance was not in the ratio. The defect was that the assignment function hashed mutable raw
-fields, so one unit could resolve to two different arms on two different reads: **51.7% of 9,074
-assignments were irreproducible**. Aggregate balance was preserved while per-unit assignment was not.
+defect was not in the ratio. The assignment function hashed mutable raw fields, so five bets landed
+in both arms, and re-hashing each stored row reproduces its arm only **47-49% of the time, the rate
+of a fresh coin**. Aggregate balance was preserved while per-unit assignment was unverifiable.
 
 **Our contribution here**, stated narrowly enough to defend: a per-unit assignment-reproducibility
 check is a distinct trust signal from SRM, it detects a failure class that ratio-based monitoring
@@ -157,9 +157,9 @@ Recommended structure, at most three datasets, chosen so each exhibits a **diffe
 | HMDA | done | rules 1 and 3 mandated by regulation; rule 4 fails structurally |
 | a third, TBD | open | ideally one where **rule 3 fails independently** |
 
-The third slot matters more than a fourth or fifth would, and for a specific reason: result 2 is
-currently our least verifiable claim. The 51.7% figure lives in a private store, and the public
-extract carries only a related identity-drift figure. A public dataset exhibiting assignment or
+The third slot matters more than a fourth or fifth would, and for a specific reason: the trial
+result rests on one system's rows. Its stored arms and per-row reproduction flags now ship in the
+extract, so the figure is checkable, but it is still one instance. A public dataset exhibiting assignment or
 identity recomputation drift would move our weakest result onto independently checkable ground. Two
 more datasets that merely re-demonstrate rule 4 would not.
 

@@ -29,12 +29,17 @@ between. The price is not being missed. It has stopped existing.
 
 Three failures sit on top of that, each of which left every dashboard green:
 
-**1. Population choice sets the sign.**
-Return on the positions the system acted on: **+2.19%**. Return on the positions it declined, 93% of
-everything it evaluated: **-2.24%**. Same model, same window, same prices. The gate is not a neutral
-filter over a fixed population; it *creates* the population, so it cannot be evaluated on it.
-Clustered by day, the acted-on interval crosses zero and the declined one does not. The finding is
-the sign change, not either number, and neither is offered as evidence of edge.
+**1. A population boundary sets the sign.**
+For its first 12 pricing days the store recorded only the positions the system took; declined
+decisions start on day 12. Pooled over the whole window, return on the positions acted on reads
+**+2.19%**. Restricted to the days on which both populations were recorded, the same figure reads
+**-0.94%**. Nothing in any aggregate reports that its population changed definition partway through,
+and the sign of the headline depends on it. Declined positions return **-2.24%**; clustered by day it
+is the only figure whose interval excludes zero (acted [-7.19, +5.71], declined [-3.82, -0.65]).
+None of this is offered as evidence of edge.
+
+This result corrects an earlier version of the paper, which reported the same +2.19% / -2.24% pair
+as "population choice flips the sign" without noticing that the pooled window crossed the boundary.
 
 **2. A filter that could never pass.**
 For 16 slate days, a category's minimum-edge bar sat above the largest edge the model is allowed to
@@ -42,12 +47,19 @@ emit. Every one of 914 positions in what the system itself rated its best-measur
 and declined; 181 sat pinned at the cap. Nothing errored. The rows were *demoted* rather than
 deleted, which is the only reason this can be counted at all.
 
-**3. A randomised trial that was never randomised.**
-A trial on the selection gate assigned arms by hashing raw row fields instead of the canonical
-identity. Raw fields drift between writers, so one bet could draw two assignments; in the shipped
-extract 356 of 10,804 bets carry more than one raw-field key. The assignment log was not retained,
-so the trial cannot be reconstructed from its own output, and no balance or effect figure from it is
-reported here.
+**3. A randomised trial that cannot be audited.**
+For nine days a trial on the selection gate assigned 1,163 positions to a bet arm or a hold arm (591
+and 572) with a deterministic coin: a hash of the position's identity and a fixed salt, so the
+assignment could never be silently re-rolled. The hash was taken over raw row fields rather than the
+canonical identity, and raw fields are spelled differently by different writers. Five bets sit in
+both arms. More damaging, re-hashing each frozen row reproduces its stored arm only **47-49%** of the
+time across every key construction we could reconstruct, which is the rate of a fresh coin. The arms
+were stamped on the rows, but no row can confirm its own assignment, so determinism, the property
+that made the trial evidence rather than an observational split, cannot be verified from its output.
+
+`data/trial_epoch1.csv` carries the stored arm and one reproduces-or-not flag per key construction,
+so the range is checkable. The exact original construction was not recorded; that is part of the
+finding.
 
 ---
 
@@ -150,7 +162,8 @@ absence can be counted. The betting store originally kept only what it acted on.
 Shipped: day index, sport, whether the row is a player prop, whether the system acted, whether a
 close existed, whether the row was graded; per-day staked/returned totals; capture-failure reasons
 with the rung counts available at the time; salted identity token pairs; the best-segment rows with
-their tier and cap flags; the hypothesis registry reduced to sequence, kind and decision.
+their tier and cap flags; the trial's stored arms with reproduction flags; the hypothesis registry
+reduced to sequence, kind and decision.
 
 Withheld: every player, game, team, book, market description, line, price, model probability and
 edge. Day indices are **relative** — day 0 is the first day of the window and nothing joins to a
@@ -214,8 +227,10 @@ and this work supplies evidence that a known problem persists rather than claimi
 
 One operator, one pipeline, 72 pricing days (positions dated on or before 20 September 2026). The
 instrumentation postdates the system, so the window is what could be measured honestly, not the
-system's full history. The selection gates tightened during the window, so the declined share rose
-over it. The hypothesis registry began mid-window, so it counts the search from that point on. The
+system's full history. The window holds three regimes, measured rather than assumed: days 0-11
+recorded only positions taken; from day 12 the full candidate slate was frozen at roughly 25 acted
+positions a day; from late August the gates admitted 3-6 a day while frozen volume nearly doubled.
+Result 1 is the first boundary; figures that pool the other two are labelled as pooled. The hypothesis registry began mid-window, so it counts the search from that point on. The
 acted-on ROI interval crosses zero under a day-clustered bootstrap; no ROI figure here is evidence
 of edge, and the paper does not offer one as such. The detectors catch these failure shapes; they do
 not repair the underlying data, and a metric that was never defined cannot be recovered after the

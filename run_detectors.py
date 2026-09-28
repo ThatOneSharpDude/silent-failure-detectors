@@ -38,10 +38,13 @@ def main():
     # strata disagree, the missingness is related to the decision and the subset is not random.
     out.append(monitor_for_absence(props, defined_key="has_close", floor=0.95, stratum_key="acted"))
 
-    # RULE 3: does one raw key ever resolve to two ids? This is the A/B that was not an A/B.
-    out.append(record_the_decision([(r["raw_field_token"], r["canonical_token"]) for r in idf]))
+    # RULE 3: does one bet ever carry two stored arms? This is the trial that cannot be audited.
+    # Keyed on the bet (date + canonical identity), not on the raw fields: a raw key without a date
+    # "collides" whenever a player's line recurs on another day, which would inflate the alarm.
+    trial = rows("trial_epoch1.csv")
+    out.append(record_the_decision([(r["bet_token"], r["stored_arm"]) for r in trial]))
 
-    # RULE 1: this table is the rule. 64,249 capture failures are RETAINED, each with the reason
+    # RULE 1: this table is the rule. 139,061 capture failures are RETAINED, each with the reason
     # it failed, instead of being dropped as "no close available" -- which is the only reason the
     # zero in the paper is knowable at all. Passing entered=len(cf) here would be circular (it
     # would check the table against itself), so what is checked is the reason distribution: if one

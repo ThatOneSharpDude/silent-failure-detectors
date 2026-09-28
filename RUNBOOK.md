@@ -1,7 +1,9 @@
 # Freeze and submit
 
 **STATUS 2026-09-28:** frozen at CUTOFF 2026-09-20 (72 pricing days, store read 2026-09-28T04:57:57Z).
-`reproduce.py` reports 0 MISMATCH; the abstract is 491 words on the strict count. The abstract now
+`reproduce.py` reports 0 MISMATCH; the abstract is 487 words on the strict count. Published
+2026-09-28. `data/trial_epoch1.csv` was added afterwards WITHOUT re-reading the store for the other
+files (their hashes were checked unchanged), because a re-read at the same cutoff drifts. The abstract now
 cites this repository, so step 5 (publish) must happen BEFORE step 6 (submit). The private checker
 `nhl-betting/reproduce.py` no longer reads the live store: it runs this repo's `reproduce.py` and also
 fails if any frozen figure is missing from the abstract text.
@@ -37,10 +39,10 @@ reproducibility, application**. Finalists are additionally judged on interest / 
 
 The limit counts the title. Measured on `SSAC_ABSTRACT_final.md`:
 
-* **491 words** counting the results table (2026-09-28 refreeze)
-* **440 words** not counting it (the table falls under the separate two-tables-or-figures allowance)
+* **487 words** counting the results table (2026-09-28)
+* **431 words** not counting it (the table falls under the separate two-tables-or-figures allowance)
 
-Re-measured after the 2026-09-20 refreeze: **491 with the table, 440 without.** Re-measure after
+Re-measured 2026-09-28: **487 with the table, 431 without.** Re-measure after
 any edit with the command in Step 3; it is the stricter of the two counts.
 
 ## 1. Refreeze the data (one constant)

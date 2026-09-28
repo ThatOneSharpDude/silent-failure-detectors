@@ -6,10 +6,10 @@ metric therefore reports on a subset that selected itself, and the more often me
 healthier the surviving subset looks. There is no threshold to alert on, because nothing is out of
 range; the thing that is wrong is the denominator.
 
-SCAR. Closing-line value looked fine across the book. It was defined on 62.7% of prop positions and
-53.8% of the positions actually taken, and the missing 37.3% were not random: a position is hardest
-to price at the close precisely when the market moved away from it. Of 13,047 capture failures, the
-rung we had taken was still quoted in ZERO of them, and only 0.41% had two-sided rungs on both sides
+SCAR. Closing-line value looked fine across the book. It was defined on 75.1% of prop positions and
+58.7% of the positions actually taken, and the missing rows were not random: a position is hardest
+to price at the close precisely when the market moved away from it. Of 139,061 capture failures, the
+rung we had taken was still quoted in ZERO of them, and only 0.33% had two-sided rungs on both sides
 to interpolate between. So the missingness is not a polling-rate problem with an engineering fix --
 the price does not exist to be captured. The metric was undefined, not noisy, and every average
 computed over it was an average over the easy cases.

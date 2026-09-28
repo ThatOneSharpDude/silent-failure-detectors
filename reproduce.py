@@ -48,6 +48,15 @@ PAPER = {
     "still_quoted": "0",
     "roi_acted": "+2.19",
     "roi_declined": "-2.24",
+    "boundary_day": "12",
+    "roi_acted_matched": "-0.94",
+    "trial_n": "1163",
+    "trial_days": "9",
+    "trial_arm_bet": "591",
+    "trial_arm_hold": "572",
+    "trial_match_lo": "47",
+    "trial_match_hi": "49",
+    "trial_both_arms": "5",
     "segment_n": "914",
     "segment_bet": "0",
     "segment_days": "16",
@@ -119,21 +128,28 @@ def betting():
           str(sum(1 for r in cf if r["our_rung_available"] == "1")))
     print("       (that zero is the point: no polling rate recovers a price nobody is offering)")
 
-    print("\nRESULTS - population choice determines the sign")
+    print("\nRESULTS - a population boundary sets the sign")
     pnl = rows("daily_pnl.csv")
-    check("ROI, positions acted on (%)", "roi_acted", "%+.2f" % roi(pnl, "acted"))
+    # The store recorded O\nY positions taken until declined rows first appear. Any pooled figure
+    # spans that boundary, so it is computed both ways.
+    boundary = min(int(r["day"]) for r in pos if r["acted"] == "0")
+    check("first day declined positions were recorded", "boundary_day", str(boundary))
+    matched = sorted({r["day"] for r in pnl if int(r["day"]) >= boundary})
+    check("ROI, positions acted on, pooled (%)", "roi_acted", "%+.2f" % roi(pnl, "acted"))
+    check("ROI, acted on, days both were recorded (%)", "roi_acted_matched",
+          "%+.2f" % roi(pnl, "acted", matched))
     check("ROI, positions declined (%)", "roi_declined", "%+.2f" % roi(pnl, "declined"))
     # day-clustered bootstrap: resample DAYS, not bets. Rows inside a day share a slate, a feed and
     # a model version, so treating them as independent overstates precision several-fold.
-    alldays = sorted({r["day"] for r in pnl})
     rng = random.Random(0)
     for pop in ("acted", "declined"):
-        b = sorted(roi(pnl, pop, [rng.choice(alldays) for _ in alldays]) for _ in range(2000))
+        b = sorted(roi(pnl, pop, [rng.choice(matched) for _ in matched]) for _ in range(2000))
         lo, hi = b[50], b[1949]
         print("  %-52s CI [%+.2f, %+.2f]  crosses zero: %s"
-              % ("day-clustered 95%% CI, %s" % pop, lo, hi, "YES" if lo <= 0 <= hi else "no"))
+              % ("day-clustered 95%% CI, matched days, %s" % pop, lo, hi,
+                 "YES" if lo <= 0 <= hi else "no"))
 
-    print("\nRESULTS - the filter that deleted its best segment")
+    print("\nRESULTS - a filter that could never pass")
     seg = rows("best_segment.csv")
     check("best segment denominator, defect window (n)", "segment_n", str(len(seg)))
     check("... of which reached a bettable tier", "segment_bet",
@@ -143,15 +159,28 @@ def betting():
           % sum(1 for r in seg if r["pinned_at_shrink_cap"] == "1"))
 
     print("\nRESULTS - the experiment that was silently not one")
-    idf = rows("identity_drift.csv")
-    for label, sel in (("whole window", idf), ("trial epoch 1", [r for r in idf if r["rct_epoch1"] == "1"])):
-        keys = collections.defaultdict(set)
-        for r in sel:
-            keys[r["canonical_token"]].add(r["raw_field_token"])
-        split = sum(1 for v in keys.values() if len(v) > 1)
-        print("  %-52s %d of %d bets carry >1 raw-field key (%s%%)"
-              % ("identity drift, " + label, split, len(keys), pct(split, len(keys))))
-    print("       a coin hashed on the raw key can land differently for the same bet")
+    tr = rows("trial_epoch1.csv")
+    check("trial epoch-1 positions (n)", "trial_n", str(len(tr)))
+    check("... days it ran", "trial_days", str(len({r["day"] for r in tr})))
+    check("... assigned to the bet arm", "trial_arm_bet",
+          str(sum(r["stored_arm"] == "ARM_BET" for r in tr)))
+    check("... assigned to the hold arm", "trial_arm_hold",
+          str(sum(r["stored_arm"] == "ARM_HOLD" for r in tr)))
+    cols = [c for c in tr[0] if c.startswith("match_")]
+    rates = {c: 100.0 * sum(r[c] == "1" for r in tr) / len(tr) for c in cols}
+    for c, v in rates.items():
+        print("  %-52s %.1f%%" % ("re-hashed row reproduces its arm, " + c[6:], v))
+    check("... lowest reproduction rate across key constructions", "trial_match_lo",
+          "%.0f" % min(rates.values()))
+    check("... highest reproduction rate across key constructions", "trial_match_hi",
+          "%.0f" % max(rates.values()))
+    print("       a fresh coin would reproduce 50%: the assignment cannot be audited from its row")
+    arms = collections.defaultdict(set)
+    for r in tr:
+        arms[r["bet_token"]].add(r["stored_arm"])
+    check("... distinct bets that sit in BOTH arms", "trial_both_arms",
+          str(sum(1 for v in arms.values() if len(v) > 1)))
+    print("       (of %d distinct bets)" % len(arms))
 
 
 def external():

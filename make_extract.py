@@ -21,6 +21,8 @@ DEFINITIONS, each matching the private checker it replaces (`nhl-betting/reprodu
     capture failure LOGGED at or before the cutoff (`ts`), never filtered on game `date`: late rows
                     are appended with old game dates, so a date filter keeps growing and cannot be
                     reproduced later by anyone, including its author
+    trial           rows carrying an epoch-1 `rct_arm` (gate_rct, 2026-08-13..08-24). The arm lives
+                    on the frozen row; the separate assignment log did not survive
     best segment    WNBA player rows 2026-08-06..2026-08-24 — the window in which the
                     `wnba_prop_scoring` bar sat above what the shrink cap can emit. It is the
                     defect's own window, fixed on 2026-08-24, and does not move with CUTOFF.
@@ -189,6 +191,37 @@ def write_registry(snapshot):
     return len(reg)
 
 
+TRIAL_SALT = "gate-rct-2026-08-13"
+TRIAL_FIELDS = ("date", "game", "market", "side", "line", "player", "stat")
+
+
+def _coin(key):
+    u = int(hashlib.sha256(key.encode("utf-8")).hexdigest()[:8], 16) / 0xFFFFFFFF
+    return "ARM_BET" if u < 0.5 else "ARM_HOLD"
+
+
+def write_trial(rows, didx, crf):
+    """Epoch 1 of the gate trial: the arm stamped on each frozen row, and whether re-hashing that
+    row's own fields reproduces it. The exact epoch-1 key construction is not recorded anywhere, so
+    every plausible construction is tried and each gets its own column; the claim is the RANGE."""
+    keys = {
+        "match_raw_fields": lambda r: TRIAL_SALT + "|" + "|".join(str(r.get(f)) for f in TRIAL_FIELDS),
+        "match_raw_fields_blank": lambda r: TRIAL_SALT + "|" + "|".join(str(r.get(f) or "")
+                                                                       for f in TRIAL_FIELDS),
+        "match_canonical": lambda r: TRIAL_SALT + "|" + "|".join(str(x) for x in crf.pick_identity(r)),
+        "match_canonical_epoch": lambda r: TRIAL_SALT + "|e1|" + "|".join(str(x)
+                                                                         for x in crf.pick_identity(r)),
+    }
+    trial = [r for r in rows if r.get("rct_arm") in ("ARM_BET", "ARM_HOLD")
+             and int(r.get("rct_epoch") or 1) == 1]
+    fh, w = _writer("trial_epoch1.csv", ["day", "bet_token", "stored_arm"] + list(keys))
+    with fh:
+        for r in trial:
+            w.writerow([didx[_date(r)], _tok("B", "|".join([_date(r)] + [str(x) for x in crf.pick_identity(r)])),
+                        r["rct_arm"]] + [int(_coin(fn(r)) == r["rct_arm"]) for fn in keys.values()])
+    return len(trial)
+
+
 def copy_clinicaltrials():
     """The second external domain. Pure function of a cached, public ClinicalTrials.gov sample."""
     dst = os.path.join(HERE, "datasets", "clinicaltrials")
@@ -217,7 +250,9 @@ def main():
     write_identity_drift(rows, didx, crf)
     n_seg = write_best_segment(rows, didx)
     n_reg = write_registry(snapshot)
+    n_trial = write_trial(rows, didx, crf)
     copy_clinicaltrials()
+    print("trial epoch-1 positions: %d" % n_trial)
     print("capture failures logged by cutoff: %d   best segment rows: %d   registry tests: %d"
           % (n_miss, n_seg, n_reg))
 

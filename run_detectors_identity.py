@@ -10,7 +10,7 @@ safe operation: names collide, and names carry characters whose normalisation is
 register is a third-party artifact whose existence is itself the evidence, since it was built to
 solve exactly this problem for public baseball datasets.
 
-DOES NOT. It does not corroborate the 51.7% irreproducibility figure from our A/B result, and must
+DOES NOT. It does not corroborate the trial's chance-level reproducibility (47-49%), and must
 not be presented as if it did. That failure was driven mainly by OTHER mutable fields in the
 identity key -- a market string respelled between writers, a line arriving as None on one path and
 0.0 on another -- with name handling only one contributor. This measures a single component of the

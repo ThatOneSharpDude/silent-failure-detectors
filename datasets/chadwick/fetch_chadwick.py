@@ -1,8 +1,7 @@
 """fetch_chadwick.py -- how often does a player's NAME fail to identify the player?
 
-WHY THIS DATASET. Our second result -- an A/B test whose assignment was recomputed from mutable raw
-fields -- is the least independently checkable claim in the paper, because the 51.7% figure lives in
-a private store. This is a public, third-party measurement of the same MECHANISM: what happens when
+WHY THIS DATASET. The trial result -- a randomised test whose coin hashed mutable raw fields, so no
+row can confirm its own arm -- rests on one system's rows. This is a public, third-party measurement of the same MECHANISM: what happens when
 identity is derived from a name instead of being carried as a stored key.
 
 The Chadwick Bureau register is a free crosswalk between the player identifiers used by MLBAM,
