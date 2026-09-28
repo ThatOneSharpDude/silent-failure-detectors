@@ -19,6 +19,10 @@ games.
 American sports.
 ✔ *Betting Markets and Market Efficiency: Evidence from College Football* — 11,000+ games, 1985–2003.
 
+✔ Scavone, *Getting Precise About Closing Line Value*, Unabated (31 Jul 2026) — practitioner
+treatment; notes that props have "very few market-making books" and "very few market signals", i.e.
+that CLV is UNRELIABLE there. It does not address the close being ABSENT.
+
 **What this literature establishes.** The closing line is the market's most informed price and is the
 standard benchmark against which forecasting skill is measured. Whether it is fully efficient is
 actively contested, and several papers find exploitable deviations.
@@ -43,9 +47,15 @@ this literature and ask what happens when the benchmark is absent on a third of 
 ○ The credit-scoring reject-inference literature, where a lender observes repayment only for
 applicants it approved.
 
-**This literature agrees with us, and that is the point.** Our third result — that evaluating a
-selection gate on the population it created flips the sign of the headline — is a textbook selection
-effect. We do not claim to have discovered it. We claim it is still happening in production systems
+✔ Kamat, *Outcome-Classified Precision Auditing of Filter Rules in Algorithmic DEX Trading:
+Evidence from 2,400 Rejection Events*, arXiv:2607.02830 (July 2026) — audits a production filter
+stack by following the market after each REJECTED event and classifying the outcome. The closest
+recent instance we found of grading declined decisions in a live trading system; same design as our
+frozen-at-entry declined positions, different domain, and no treatment of missing prices.
+
+**This literature agrees with us, and that is the point.** Our population result — that a pooled
+return figure changes sign because the recorded population changed definition partway through the
+window — is a textbook selection effect. We do not claim to have discovered it. We claim it is still happening in production systems
 that believe they have controlled for it, and we measure what it costs.
 
 Two things we can add rather than restate:
@@ -77,6 +87,11 @@ Mismatch Detection* (eBay), arXiv:2208.07766 — production randomization valida
 stability index (PSI)** plus sequential SRM detection.
 ○ Kohavi, Tang & Xu, *Trustworthy Online Controlled Experiments* (2020) — SRM as the canonical
 trust check; A/A tests as a platform validation.
+✔ US 12,147,397 B2, *Method and system for detecting data bucket inconsistencies for A/B
+experimentation* (Yahoo Ad Tech; filed 2017, granted 2024) — detects units assigned to more than one
+bucket by INTERSECTING the logged identifier sets of each bucket.
+✔ Practitioner guidance on deterministic bucketing (e.g. hash of salt and a stable unit id) treats
+"recompute the assignment if the log is lost" as a design property, which presumes the key is stable.
 
 **What is established.** Sample ratio mismatch is the standard first-line indicator of a broken
 experiment, and mature platforms automate it. The eBay paper is the state of the art we found for
@@ -93,13 +108,18 @@ defect was not in the ratio. The assignment function hashed mutable raw fields, 
 in both arms, and re-hashing each stored row reproduces its arm only **47-49% of the time, the rate
 of a fresh coin**. Aggregate balance was preserved while per-unit assignment was unverifiable.
 
-**Our contribution here**, stated narrowly enough to defend: a per-unit assignment-reproducibility
-check is a distinct trust signal from SRM, it detects a failure class that ratio-based monitoring
-cannot see by construction, and we exhibit a production instance where the ratio check would have
-passed. We are not claiming SRM is wrong or that nobody has thought about assignment stability — we
-are claiming the automated checks documented in the sources above test a different property, and we
-found no source that tests this one. If a reviewer knows of one, that narrows the contribution to the
-measurement rather than the method, and the paper survives that.
+**What is NOT ours.** Detecting a unit that sits in two arms is prior art: the Yahoo patent does it
+by log intersection, and our `record_the_decision` detector is the same check (it finds our five
+bets). Deterministic hashing on a stable key is standard practice.
+
+**Our contribution here**, stated narrowly enough to defend: re-deriving each unit's assignment from
+the row it is stored on, and comparing, is a different check from both SRM and overlap detection.
+It is the one that exposes our failure. Overlap detection finds 5 of 1,158 bets; re-derivation shows
+that NO row can confirm its own arm (47-49% agreement, the rate of a coin), which is what removes the
+experiment's defence against silent re-rolling. We exhibit a production instance where the ratio
+check and the overlap check both look nearly clean and the per-unit check does not. We found no
+published source that runs this check; if a reviewer knows one, that narrows the contribution to the
+measurement, and the paper survives that.
 
 ---
 
@@ -168,16 +188,18 @@ more datasets that merely re-demonstrate rule 4 would not.
 ## Summary of the claim
 
 **Established, and cited as agreement:** selection bias and reject inference; MNAR missingness; the
-closing line as a skill benchmark; silent data-quality failure as a production problem; SRM as an
-experiment trust check.
+closing line as a skill benchmark, and its unreliability in props; grading rejected decisions in a
+production filter; silent data-quality failure as a production problem; SRM and bucket-overlap
+detection as experiment trust checks.
 
 **What we add:**
 
 1. A measurement of how often the closing price is *absent rather than noisy* in thin markets, with
-   the result that no polling rate recovers it — across 64,051 logged failures, zero occurred while
+   the result that no polling rate recovers it — across 139,061 logged failures, zero occurred while
    the wagered rung was still quoted.
-2. A production instance where aggregate experiment balance held while per-unit assignment was
-   irreproducible, which ratio-based monitoring cannot detect.
+2. A production instance where aggregate experiment balance held and overlap checks were nearly
+   clean while no unit's assignment could be re-derived from its own row — a failure that
+   ratio-based and overlap-based monitoring cannot detect.
 3. Four design rules with open-source detectors, shown to fire on a second domain the authors have no
    connection to, and shown to come back clean exactly where federal regulation already mandates the
    rules.
