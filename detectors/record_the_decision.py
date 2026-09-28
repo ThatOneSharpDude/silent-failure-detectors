@@ -8,7 +8,7 @@ reconstructed from what would happen now, and the two quietly disagree.
 SCAR. A randomised trial on a selection gate stamped each arm with a deterministic coin, a hash of the
 position's identity, so any assignment could be audited by re-deriving it. The arm WAS written onto
 each row, which is the only reason what follows is measurable. Re-deriving every stored arm with the
-coin's exactly known formula gives a step: all 2,480 arms stamped from 5 September re-derive, and the
+coin's formula as written in the code today gives a step: all 2,480 arms from day 56 re-derive, and the
 1,258 stamped before match 50.6%, a coin flip. Something changed that nothing records, and every
 earlier assignment became unverifiable from its own row. An earlier version keyed on raw fields also
 put five bets in both arms, which is what this detector finds.

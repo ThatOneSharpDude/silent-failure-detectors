@@ -23,10 +23,11 @@ show you a wrong number. It cannot show you a number that is not there.
 **The betting version.** Bettors judge skill with closing line value (CLV): did you get a better price
 than the market's final one? On player props, books often pull a line before the game starts, so there
 is no closing price and no CLV for that bet. Here, 25% of prop positions had no closing price. And
-whether a bet has one depends on what the system decided: on 39 of 60 days, bets it took were better
-covered than bets it passed on. So CLV is always computed on a slice of the book the system itself
-picked. The failure log shows why prices go missing: in 86% of failed captures the player's whole
-market was gone, and in the rest the line had moved off the number that was bet.
+whether a bet has one is not independent of what the system decided: over the same 60 days, bets it
+took were missing a close 8.0 points more often than bets it passed on. So CLV is computed on a slice
+of the book the system itself picked, and that slice is not representative. The failure log shows how
+prices go missing: in 86% of failed captures the feed had no market for the player, and in the rest
+the line had moved off the number that was bet.
 
 **Three more things that broke without anyone noticing:**
 
@@ -38,10 +39,10 @@ market was gone, and in the rest the line had moved off the number that was bet.
    output. For 16 days, 0 of 914 positions in the segment the system measured best could become a
    bet. No error. It was an off switch that looked like a filter.
 3. **A fair coin nobody can check.** A randomised test flipped a reproducible coin for each bet so
-   nobody could quietly re-flip it until they liked the answer. Using the coin's exact, known formula,
-   every assignment made from 5 September on can be re-checked: all 2,480 match. The 1,258 made before
-   5 September match 50.6% of the time, a coin flip. Something changed that day, and nothing in the
-   system records what. The test's own record cannot prove the test was fair.
+   nobody could quietly re-flip it until they liked the answer. Using the formula in the code today,
+   every assignment from day 56 on can be re-checked: all 2,480 match. The 1,258 made before day 56
+   match 50.6% of the time, a coin flip. Something changed, and nothing in the system records what.
+   The test's own record cannot prove the test was fair.
 
 **Validated elsewhere.** Run unchanged on public data where the answer is known in advance, the same
 detectors find it: an interest rate on 96.3% of approved mortgages and 0% of denied ones, and posted
@@ -83,27 +84,36 @@ making sure you can trust the scoreboard.
 ## The finding, and three failures
 
 **The metric is often undefined, and whether it is defined depends on the decision.**
-Closing-line value exists only where a closing price was captured: 75.1% of prop positions. On the 60
-days where both taken and declined positions were recorded, taken positions were better covered on 39
-days (two-sided sign test p = 0.03). The *size* of the difference depends on how days are weighted, so
-it is not the headline:
+Closing-line value exists only where a closing price was captured: 75.1% of prop positions (75.8% on
+the 60 days where both taken and declined positions were recorded). Over those same 60 days, taken
+positions lack a close **8.0 points more often** than declined ones (day-clustered 95% interval
+[+1.8, +14.2]). That is the practical question, whether the subset CLV is computed on is
+representative, and it is not. Within individual days the comparison reverses sign, and its size
+depends on weighting:
 
 | comparison, taken minus declined, share missing a close | gap (pp) |
 |---|---|
 | within day, weighted by taken count (day-clustered 95% CI [-15.6, -1.4]) | -8.7 |
 | within day, days weighted equally | -1.4 |
 | within day, weighted by declined count | +1.6 |
-| pooled over the same 60 days | +8.0 |
+| pooled over the same 60 days (day-clustered 95% CI [+1.8, +14.2]) | +8.0 |
 
-Pooled comparisons are confounded by time: taken positions cluster early in the window, when capture
-was worse, and declined volume grew late, when it was better. Line type (main versus alternate line)
-is an unexamined confounder. What survives every cut is that coverage is not independent of the
-decision, so CLV describes a subset the system selected. In missing-data terms this establishes that
+A day-level sign test is **not** valid here, and an earlier revision used one: with few taken
+positions a day, a taken no-close rate of exactly 0 is common, so taken positions "win" more than
+half of days even with no effect. Under a within-day permutation null the expected count is 34.3 of 60
+days, not 30; the observed 39 gives p = 0.27. `reproduce.py` prints this so the wrong test is not
+re-derived.
+
+The pooled gap is partly time: taken positions cluster early in the window, when capture was worse,
+and declined volume grew late, when it was better. Line type (main versus alternate line) is an
+unexamined confounder. For evaluation that does not matter: whatever the cause, the positions CLV is
+computed on are not representative of the positions evaluated. In missing-data terms this establishes that
 the missingness is not completely at random; it does not establish that it depends on the outcome.
 
 **What the failure log shows.** 139,061 capture attempts failed. These are *polling events*, not
-positions: one position can fail many times, and 90% are WNBA. In 119,001 (86%) the player had no
-market at all. In the other 20,060 the line had moved off the wagered rung, and only 66 (0.33%) left a
+positions: one position can fail many times, 90% are WNBA while 84% of prop positions without a close
+are MLB, and logging starts on day 7. In 119,001 (86%) the feed had no market for the player, which
+may be a market that was pulled or a name that did not match. In the other 20,060 the line had moved off the wagered rung, and only 66 (0.33%) left a
 two-sided quote on each side of it to interpolate between. A failure is logged only when the wagered
 rung is absent, so "the rung was never still quoted" is true by definition and is not claimed as a
 finding. Nor is it claimed that no price could be modelled: 98.6% of line-moved failures had at least
@@ -135,16 +145,17 @@ A randomised trial on the selection gate assigned positions to a bet arm or a ho
 deterministic coin, a hash of the position's identity and a fixed salt, so that any assignment could
 be audited by re-deriving it and none could be silently re-rolled. The arms were stamped on the rows.
 
-*The known-formula result.* From 24 August the coin used a formula recorded exactly in the code.
-Re-deriving every stored arm with it gives a clean step (`data/trial_epoch2_control.csv`): all 2,480
-arms stamped from 5 September re-derive (100%), and the 1,258 stamped before match 50.6% of the time,
-a coin flip. The code history shows no change to how arms were stamped that week, and the identity
-function kept changing after 5 September without breaking later rows. Whatever changed, nothing in
-the system records it, and every assignment before that date can no longer be verified from its row.
-That is Rule 3 in one picture: re-deriving a decision audits today's inputs, not what happened.
+*The step.* From day 44 the coin used a formula written in the code today. Re-deriving every stored
+arm with it gives a clean step (`data/trial_epoch2_control.csv`): all 2,480 arms stamped from day 56
+re-derive (100%), and every day before it re-derives at 41-57%, 50.6% over 1,258 arms, a coin flip.
+No day is partly right, which points to a whole-block difference (salt, key order or formula) rather
+than drifting inputs: the formula that stamped the earlier arms is evidently not the one in the code.
+The code history shows no change to how arms were stamped that week. Whatever changed, nothing in the
+system records it, and every earlier assignment can no longer be verified from its row. That is Rule
+3 in one picture: re-deriving a decision audits today's code, not what happened.
 
-*The first version.* From 13 to 24 August the coin was keyed on raw row fields, whose exact
-construction was not recorded. Over those nine days it assigned 1,163 positions (591 to the bet arm,
+*The first version.* On days 36-44 the coin was keyed on raw row fields, whose exact construction
+was not recorded. Over those nine pricing days it assigned 1,163 positions (591 to the bet arm,
 572 to hold) and put five bets in both arms (`data/trial_epoch1.csv`). Re-deriving those arms under
 four plausible reconstructions matches 47-49%; because the original construction is unknown, that
 only shows that no reconstruction re-derives them, and it is not offered as evidence of mechanism.
@@ -291,10 +302,10 @@ measurement that a known problem is live and silent in production, and detectors
 One operator, one pipeline, 72 pricing days (positions dated on or before 20 September 2026). The
 instrumentation postdates the system, so the window is what could be measured honestly, not the
 system's full history. The window holds three regimes: days 0-11 recorded only positions taken; from
-day 12 the full candidate slate was frozen at roughly 25 acted positions a day; from late August the
-gates admitted 3-6 a day while frozen volume nearly doubled. The size of the coverage gap depends on
-weighting and line type is unexamined. Failure counts are polling events, 90% WNBA. The cause of the
-5 September step is not recorded. No ROI figure here is evidence of edge. The detectors catch these
+day 12 the full candidate slate was frozen at roughly 25 acted positions a day; from about day 40 the
+gates admitted 3-6 a day while frozen volume nearly doubled. The coverage gap reverses sign within
+days, its size depends on weighting, and line type is unexamined. Failure counts are polling events,
+90% WNBA, logged from day 7. The cause of the day-56 step is not recorded. No ROI figure here is evidence of edge. The detectors catch these
 failure shapes; they do not repair the underlying data.
 
 ---

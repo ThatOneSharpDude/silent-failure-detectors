@@ -53,14 +53,17 @@ PAPER = {
     "linemoved_still_quoted": "0",
     "within_day_gap": "8.7",
     "within_day_gap_excludes_zero": "yes",
-    "sign_test_days_better": "39",
-    "sign_test_days": "60",
-    "sign_test_p": "0.03",
+    "pooled_gap_matched": "8.0",
+    "pooled_gap_excludes_zero": "yes",
+    "failure_log_first_day": "7",
+    "failure_wnba_pct": "90",
     "player_absent_pct": "86",
     "roi_acted": "+2.19",
     "roi_declined": "-2.24",
     "boundary_day": "12",
     "roi_acted_matched": "-0.94",
+    "roi_gap_unmatched": "+4.4",
+    "roi_gap_matched": "+1.3",
     "trial_n": "1163",
     "trial_days": "9",
     "trial_arm_bet": "591",
@@ -166,13 +169,39 @@ def betting():
                   / sum(len(byday[d]["d"]) for d in both))
     print("  %-52s taken-weighted %+.1f | equal days %+.1f | declined-weighted %+.1f"
           % ("... sensitivity of the gap to weighting (pp)", gap, eq, dw))
-    nz = [diff[d][0] for d in both if diff[d][0] != 0]
-    better = sum(1 for x in nz if x < 0)
-    k = min(better, len(nz) - better)
-    p_sign = min(1.0, 2.0 * sum(math.comb(len(nz), i) for i in range(k + 1)) / 2 ** len(nz))
-    check("days on which taken positions were better covered", "sign_test_days_better", str(better))
-    check("... out of days with both populations", "sign_test_days", str(len(nz)))
-    check("... two-sided sign test p", "sign_test_p", "%.2f" % p_sign)
+    # THE HEADLINE COMPARISON: pooled over the SAME days (both populations recorded), day-clustered.
+    # It answers the practical question, "is the subset CLV is computed on representative?", and it
+    # is not. Within days the sign reverses (above), which is reported as a limitation.
+    def pooled(ds):
+        tt = [r for d in ds for r in byday[d]["t"]]
+        dd = [r for d in ds for r in byday[d]["d"]]
+        return 100.0 * (nc(tt) - nc(dd))
+    pg = pooled(both)
+    check("same 60 days, pooled: taken lack a close MORE often by (pp)", "pooled_gap_matched", "%.1f" % pg)
+    rng = random.Random(0)
+    b = sorted(pooled([rng.choice(both) for _ in both]) for _ in range(2000))
+    lo, hi = b[50], b[1949]
+    print("  %-52s CI [%+.1f, %+.1f]" % ("... day-clustered 95% interval", lo, hi))
+    check("... interval excludes zero", "pooled_gap_excludes_zero", "no" if lo <= 0 <= hi else "yes")
+    # A day-level sign test is NOT valid here: with few taken positions a day, a taken no-close rate
+    # of exactly 0 is common, so taken "wins" more than half of days under the null. Shown with its
+    # permutation null so no one re-derives the wrong p-value from it.
+    better = sum(1 for d in both if diff[d][0] < 0)
+    prng = random.Random(1)
+    null = []
+    for _ in range(1000):
+        w = 0
+        for d in both:
+            rs = byday[d]["t"] + byday[d]["d"]
+            flags = [1] * len(byday[d]["t"]) + [0] * len(byday[d]["d"])
+            prng.shuffle(flags)
+            tt = [r for r, f in zip(rs, flags) if f]
+            dd = [r for r, f in zip(rs, flags) if not f]
+            w += nc(tt) < nc(dd)
+        null.append(w)
+    print("  %-52s %d of %d days; permutation null mean %.1f (not 30), p = %.2f"
+          % ("(info) days taken better covered", better, len(both), sum(null) / len(null),
+             min(1.0, 2.0 * sum(1 for x in null if x >= better) / len(null))))
 
     cf = rows("capture_failures.csv")
     moved = [r for r in cf if r["why"] == "line-moved"]
@@ -185,6 +214,10 @@ def betting():
     check("... where the player had no market at all", "player_absent", str(n_absent))
     check("... as a share of failed captures (%)", "player_absent_pct", pct(n_absent, len(cf), "%.0f"))
     print("       (failed captures are POLLING EVENTS, not positions: one position can fail many times)")
+    check("... first day with a logged failure", "failure_log_first_day",
+          str(min(int(r["day"]) for r in cf if r["day"] != "")))
+    check("... share that are WNBA (%)", "failure_wnba_pct",
+          pct(sum(1 for r in cf if r["sport"] == "WNBA"), len(cf), "%.0f"))
     check("line-moved failures where our rung WAS still quoted (0 by construction)", "linemoved_still_quoted",
           str(sum(1 for r in moved if r["our_rung_available"] == "1")))
     check("failures where our rung WAS still quoted (0 by construction)", "still_quoted",
@@ -203,6 +236,10 @@ def betting():
     check("ROI, acted on, days both were recorded (%)", "roi_acted_matched",
           "%+.2f" % roi(pnl, "acted", matched))
     check("ROI, positions declined (%)", "roi_declined", "%+.2f" % roi(pnl, "declined"))
+    check("acted minus declined ROI, unmatched windows (pp)", "roi_gap_unmatched",
+          "%+.1f" % (roi(pnl, "acted") - roi(pnl, "declined")))
+    check("acted minus declined ROI, matched days (pp)", "roi_gap_matched",
+          "%+.1f" % (roi(pnl, "acted", matched) - roi(pnl, "declined", matched)))
     # day-clustered bootstrap: resample DAYS, not bets. Rows inside a day share a slate, a feed and
     # a model version, so treating them as independent overstates precision several-fold.
     rng = random.Random(0)

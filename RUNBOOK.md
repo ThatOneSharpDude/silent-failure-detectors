@@ -1,7 +1,7 @@
 # Freeze and submit
 
 **STATUS 2026-09-28:** frozen at CUTOFF 2026-09-20 (72 pricing days, store read 2026-09-28T04:57:57Z).
-`reproduce.py` reports 0 MISMATCH; the abstract is 479 words on the strict count (480 loose). Published
+`reproduce.py` reports 0 MISMATCH; the abstract is 481 words (strict and loose). Published
 2026-09-28. `data/trial_epoch1.csv` was added afterwards WITHOUT re-reading the store for the other
 files (their hashes were checked unchanged), because a re-read at the same cutoff drifts. The abstract now
 cites this repository, so step 5 (publish) must happen BEFORE step 6 (submit). The private checker

@@ -105,7 +105,7 @@ again.
 Our failure passes both. The first version's arms were balanced 591 to 572 across nine days, so an
 SRM test would have returned clean, and a PSI check would have found the populations stable, because
 the defect was not in the ratio. Under the second version's exactly known formula, re-deriving every
-stored arm gives a step: all 2,480 arms stamped from 5 September re-derive, and the 1,258 stamped
+stored arm gives a step: all 2,480 arms stamped from day 56 re-derive, and the 1,258 stamped
 before match 50.6%, a coin flip, with nothing in the system recording what changed. Aggregate balance
 was preserved while per-unit assignment became unverifiable.
 
@@ -117,7 +117,7 @@ bets). Deterministic hashing on a stable key is standard practice.
 the row it is stored on, and comparing, is a different check from both SRM and overlap detection.
 It is the one that exposes our failure. Overlap detection finds 5 of 1,158 bets in the first version
 and none in the second; re-derivation under a known formula shows that every arm stamped before a
-silent change on 5 September can no longer be verified from its row, which is what removes the
+silent change at day 56 can no longer be verified from its row, which is what removes the
 experiment's defence against silent re-rolling. We exhibit a production instance where the ratio
 check and the overlap check both look nearly clean and the per-unit check does not. We found no
 published source that runs this check; if a reviewer knows one, that narrows the contribution to the
@@ -197,9 +197,10 @@ detection as experiment trust checks.
 **What we add:**
 
 1. A measurement of how often the closing price is *absent rather than noisy* in thin markets, with
-   the result that no polling rate recovers it — across 20,060 line-movement failures, zero occurred
-   while the wagered rung was still quoted, and in 119,001 more the player had no market at all; and
-   that the absence depends on the system's own decision within the same day.
+   a description of how captures fail (in 86% of failed polls the feed had no market for the player;
+   in the rest the line had moved and a bracketing quote existed 0.33% of the time); and that the
+   positions CLV is computed on are not representative of those evaluated (taken positions lack a
+   close 8.0 points more often over the same days, day-clustered interval excluding zero).
 2. A production instance where aggregate experiment balance held and overlap checks were nearly
    clean while no unit's assignment could be re-derived from its own row — a failure that
    ratio-based and overlap-based monitoring cannot detect.
