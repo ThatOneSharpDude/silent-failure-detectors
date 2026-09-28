@@ -1,9 +1,15 @@
-"""reproduce.py — regenerate every figure in the abstract from the shipped CSVs. No network.
+"""reproduce.py — regenerate every figure in the abstract from the shipped files. No network.
 
 Run:  python reproduce.py
 
-Each block prints the value this data produces next to the value printed in the paper. If a line
-says MISMATCH, the paper and the data disagree and the paper is wrong, not the data.
+Each line prints the value this data produces next to the value printed in the paper, compared as
+the paper prints it (same rounding) with ZERO tolerance. If a line says MISMATCH, the paper and the
+data disagree and the paper is wrong, not the data. Exit status is 1 on any mismatch.
+
+Zero tolerance is deliberate. An earlier checker allowed "drift tolerance" on figures read from the
+live store, and that tolerance hid a headline ROI moving from +1.60% to +0.40% at an unchanged
+cutoff. The fix was to freeze the data, not to widen the band: this script reads only files in this
+repository, which do not change.
 
 WHAT IS AND IS NOT HERE. The data is deliberately reduced to what the claims need:
 
@@ -22,9 +28,41 @@ import collections
 import csv
 import os
 import random
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 D = os.path.join(HERE, "data")
+
+# Every figure the abstract prints, exactly as printed.
+PAPER = {
+    "positions": "17447",
+    "pricing_days": "72",
+    "declined_pct": "93",
+    "prop_rows": "14104",
+    "prop_noclose_pct": "24.9",
+    "taken_noclose_pct": "41.3",
+    "linemoved": "20060",
+    "bracketing": "66",
+    "bracketing_pct": "0.33",
+    "logged": "139061",
+    "still_quoted": "0",
+    "roi_acted": "+2.19",
+    "roi_declined": "-2.24",
+    "segment_n": "914",
+    "segment_bet": "0",
+    "segment_days": "16",
+    "registry": "76",
+    "hmda_n": "44128",
+    "hmda_orig_pct": "96.3",
+    "hmda_denied_pct": "0.0",
+    "ct_n": "40000",
+    "ct_completed_pct": "24.3",
+    "ct_withdrawn_n": "1445",
+    "ct_withdrawn_pct": "0.0",
+}
+
+_bad = []
+RESULTS = []          # (label, key, data, paper, ok) for callers that want the verdicts, not the print
 
 
 def rows(name):
@@ -32,75 +70,134 @@ def rows(name):
         return list(csv.DictReader(fh))
 
 
-def check(label, got, paper, fmt="%.1f"):
-    g = fmt % got if isinstance(got, float) else str(got)
-    p = fmt % paper if isinstance(paper, float) else str(paper)
-    ok = "OK" if g == p else "MISMATCH"
-    print("  %-52s data=%-10s paper=%-10s %s" % (label, g, p, ok))
+def check(label, key, got):
+    ok = got == PAPER[key]
+    RESULTS.append((label, key, got, PAPER[key], ok))
+    if not ok:
+        _bad.append(label)
+    print("  %-52s data=%-10s paper=%-10s %s" % (label, got, PAPER[key], "OK" if ok else "MISMATCH"))
 
 
-print("=" * 92)
-print("  REPRODUCING THE ABSTRACT'S FIGURES FROM THE SHIPPED DATA")
-print("=" * 92)
-print(open(os.path.join(D, "CUTOFF.txt"), encoding="utf-8").read())
-
-pos = rows("positions.csv")
-print("METHODS")
-check("evaluated positions (n)", len(pos), 8017)
-check("of which graded", sum(int(r["graded"]) for r in pos), 7767)
-declined = sum(1 for r in pos if r["acted"] == "0")
-check("share the system declined (%)", 100.0 * declined / len(pos), 87.0, "%.0f")
-
-print("\nRESULTS — the metric is undefined, not merely noisy")
-props = [r for r in pos if r["market_class"] == "PROP"]
-check("prop rows", len(props), 6391)
-noclose = [r for r in props if r["has_close"] == "0"]
-check("prop rows with no closing price (%)", 100.0 * len(noclose) / len(props), 37.3)
-taken = [r for r in props if r["acted"] == "1"]
-check("... among positions taken (%)",
-      100.0 * sum(1 for r in taken if r["has_close"] == "0") / max(len(taken), 1), 46.2)
-
-cf = rows("capture_failures.csv")
-moved = [r for r in cf if r["why"] == "line-moved"]
-check("capture failures from line movement", len(moved), 13047)
-brack = sum(1 for r in moved if r["brackets_two_sided"] == "1")
-check("... with bracketing two-sided rungs", brack, 53)
-check("... as a share (%)", 100.0 * brack / max(len(moved), 1), 0.41, "%.2f")
-avail = sum(1 for r in cf if r["our_rung_available"] == "1")
-check("failures where our rung WAS still quoted", avail, 0)
-print("       (that zero is the point: no polling rate recovers a price nobody is offering)")
-
-print("\nRESULTS — population choice determines the sign")
-pnl = rows("daily_pnl.csv")
+def pct(a, b, fmt="%.1f"):
+    return fmt % (100.0 * a / b) if b else "nan"
 
 
-def roi(pop, days=None):
+def roi(pnl, pop, days=None):
     sel = [r for r in pnl if r["population"] == pop and (days is None or r["day"] in days)]
     st = sum(float(r["staked_units"]) for r in sel)
     rt = sum(float(r["returned_units"]) for r in sel)
     return 100.0 * (rt - st) / st if st else 0.0
 
 
-check("ROI, positions taken (%)", roi("acted"), 1.60, "%.2f")
-check("ROI, all evaluated positions (%)", roi("declined"), -1.40, "%.2f")
+def betting():
+    pos = rows("positions.csv")
+    print("METHODS")
+    check("evaluated positions (n)", "positions", str(len(pos)))
+    check("pricing days", "pricing_days", str(len({r["day"] for r in pos})))
+    check("share the system declined (%)", "declined_pct",
+          pct(sum(1 for r in pos if r["acted"] == "0"), len(pos), "%.0f"))
+    reg = rows("registry.csv")
+    check("tests in the append-only registry", "registry", str(len(reg)))
 
-# day-clustered bootstrap: resample DAYS, not bets. Rows inside a day share a slate, a feed and a
-# model version, so treating them as independent overstates precision several-fold.
-alldays = sorted({r["day"] for r in pnl})
-rng = random.Random(0)
-for pop in ("acted", "declined"):
-    b = sorted(roi(pop, [rng.choice(alldays) for _ in alldays]) for _ in range(2000))
-    lo, hi = b[50], b[1949]
-    print("  %-52s CI [%+.2f, %+.2f]  crosses zero: %s"
-          % ("clustered 95%% CI, %s" % pop, lo, hi, "YES" if lo <= 0 <= hi else "no"))
+    print("\nRESULTS - the metric is undefined, not merely noisy")
+    props = [r for r in pos if r["is_prop"] == "1"]
+    check("prop rows", "prop_rows", str(len(props)))
+    check("prop rows with no closing price (%)", "prop_noclose_pct",
+          pct(sum(1 for r in props if r["has_close"] == "0"), len(props)))
+    taken = [r for r in props if r["acted"] == "1"]
+    check("... among positions taken (%)", "taken_noclose_pct",
+          pct(sum(1 for r in taken if r["has_close"] == "0"), len(taken)))
 
-print("\nRESULTS — the experiment that was silently not one")
-idf = rows("identity_drift.csv")
-pair = collections.defaultdict(set)
-for r in idf:
-    pair[r["raw_field_token"]].add(r["canonical_token"])
-split = sum(1 for k, v in pair.items() if len(v) > 1)
-print("  %-52s %d of %d raw keys map to >1 canonical id"
-      % ("identity drift", split, len(pair)))
-print("       one bet drawing two assignments is what made the A/B irreproducible")
-print("=" * 92)
+    cf = rows("capture_failures.csv")
+    moved = [r for r in cf if r["why"] == "line-moved"]
+    brack = sum(1 for r in moved if r["brackets_two_sided"] == "1")
+    check("capture failures from line movement", "linemoved", str(len(moved)))
+    check("... with bracketing two-sided rungs", "bracketing", str(brack))
+    check("... as a share (%)", "bracketing_pct", pct(brack, len(moved), "%.2f"))
+    check("capture failures logged in total", "logged", str(len(cf)))
+    check("failures where our rung WAS still quoted", "still_quoted",
+          str(sum(1 for r in cf if r["our_rung_available"] == "1")))
+    print("       (that zero is the point: no polling rate recovers a price nobody is offering)")
+
+    print("\nRESULTS - population choice determines the sign")
+    pnl = rows("daily_pnl.csv")
+    check("ROI, positions acted on (%)", "roi_acted", "%+.2f" % roi(pnl, "acted"))
+    check("ROI, positions declined (%)", "roi_declined", "%+.2f" % roi(pnl, "declined"))
+    # day-clustered bootstrap: resample DAYS, not bets. Rows inside a day share a slate, a feed and
+    # a model version, so treating them as independent overstates precision several-fold.
+    alldays = sorted({r["day"] for r in pnl})
+    rng = random.Random(0)
+    for pop in ("acted", "declined"):
+        b = sorted(roi(pnl, pop, [rng.choice(alldays) for _ in alldays]) for _ in range(2000))
+        lo, hi = b[50], b[1949]
+        print("  %-52s CI [%+.2f, %+.2f]  crosses zero: %s"
+              % ("day-clustered 95%% CI, %s" % pop, lo, hi, "YES" if lo <= 0 <= hi else "no"))
+
+    print("\nRESULTS - the filter that deleted its best segment")
+    seg = rows("best_segment.csv")
+    check("best segment denominator, defect window (n)", "segment_n", str(len(seg)))
+    check("... of which reached a bettable tier", "segment_bet",
+          str(sum(1 for r in seg if r["reached_bet_tier"] == "1")))
+    check("... slate days", "segment_days", str(len({r["day"] for r in seg})))
+    print("       pinned at the shrink cap: %d  (the bar sat above the highest edge the model can emit)"
+          % sum(1 for r in seg if r["pinned_at_shrink_cap"] == "1"))
+
+    print("\nRESULTS - the experiment that was silently not one")
+    idf = rows("identity_drift.csv")
+    for label, sel in (("whole window", idf), ("trial epoch 1", [r for r in idf if r["rct_epoch1"] == "1"])):
+        keys = collections.defaultdict(set)
+        for r in sel:
+            keys[r["canonical_token"]].add(r["raw_field_token"])
+        split = sum(1 for v in keys.values() if len(v) > 1)
+        print("  %-52s %d of %d bets carry >1 raw-field key (%s%%)"
+              % ("identity drift, " + label, split, len(keys), pct(split, len(keys))))
+    print("       a coin hashed on the raw key can land differently for the same bet")
+
+
+def external():
+    print("\nTHE SAME DETECTORS, OTHER DOMAINS")
+    path = os.path.join(HERE, "datasets", "hmda", "hmda_extract.csv")
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as fh:
+            h = list(csv.DictReader(fh))
+        rate = lambda sel: pct(sum(1 for r in sel if r["has_interest_rate"] == "1"), len(sel))
+        check("HMDA applications (n)", "hmda_n", str(len(h)))
+        check("HMDA rate present, originated (%)", "hmda_orig_pct",
+              rate([r for r in h if r["action"] == "originated"]))
+        check("HMDA rate present, denied (%)", "hmda_denied_pct",
+              rate([r for r in h if r["action"] == "denied"]))
+    else:
+        _bad.append("HMDA extract missing")
+        print("  HMDA extract missing: run  py datasets/hmda/fetch_hmda.py")
+
+    sys.path.insert(0, os.path.join(HERE, "datasets", "clinicaltrials"))
+    import clinicaltrials as ct
+    ctrows = ct.load()
+    s = ct.analyse(ctrows)
+    wd = [r for r in ctrows if r.get("study_type") == "INTERVENTIONAL" and r.get("status") == "WITHDRAWN"]
+    check("trials sampled (n)", "ct_n", str(s["n_total"]))
+    check("results posted, completed interventional (%)", "ct_completed_pct",
+          "%.1f" % s["interv_completed_rate"])
+    check("withdrawn interventional trials (n)", "ct_withdrawn_n", str(len(wd)))
+    check("results posted, withdrawn (%)", "ct_withdrawn_pct",
+          pct(sum(1 for r in wd if r["has_results"]), len(wd)))
+
+
+def main():
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+    print("=" * 92)
+    print("  REPRODUCING THE ABSTRACT'S FIGURES FROM THE SHIPPED DATA")
+    print("=" * 92)
+    print(open(os.path.join(D, "CUTOFF.txt"), encoding="utf-8").read())
+    betting()
+    external()
+    print("=" * 92)
+    print("  %d MISMATCH" % len(_bad))
+    return 1 if _bad else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

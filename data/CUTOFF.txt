@@ -1,3 +1,5 @@
-All data frozen at 2026-08-24 (45 pricing days).
+Positions dated on or before 2026-09-20 (72 pricing days); store read at 2026-09-28T04:57:57Z.
+The live store keeps settling old rows, so a later read at the same cutoff differs.
+This extract, not the store, is the record every figure in the paper is computed from.
 Day indices are RELATIVE (day 0 = first day in window) and carry no calendar alignment.
 The salt is generated per run and discarded; tokens cannot be inverted.

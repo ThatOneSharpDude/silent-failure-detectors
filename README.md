@@ -4,8 +4,9 @@
 Companion code and data for an MIT Sloan Sports Analytics Conference submission.
 
 A system that grades itself using data it produced will fail in ways its own output cannot show.
-This repository is the record of three such failures on a live sports betting book, every figure in
-the paper regenerated from the shipped data, and four detectors that would have caught them.
+This repository is the record of such failures on a live sports betting book, every figure in the
+paper regenerated from the shipped data, and four detectors that would have caught them, run
+unmodified on federal mortgage data and clinical trial registration as well.
 
 The claim is not that a model beat a market. Neither return figure here is distinguishable from
 zero. The claim is about **measurement**: each failure below left every dashboard green, and two of
@@ -13,31 +14,40 @@ them made the system look *better* the worse they got.
 
 ---
 
-## The three failures
+## The finding, and three failures
 
-**1. A metric that was undefined, not merely noisy.**
-Closing-line value was computed over the rows where a closing price existed — 62.7% of prop
-positions, and only 53.8% of the positions actually taken. The missing rows are not random. A
-position is hardest to price at the close precisely when the market has moved away from it, so the
-average was taken over the easy cases and reported as the average.
+**The metric is undefined, not merely noisy.**
+Closing-line value exists only where a closing price was captured: 75.1% of prop positions, and only
+58.7% of the positions actually taken. The missing rows are not random. A position is hardest to
+price at the close precisely when the market has moved away from it, so the average is taken over
+the easy cases and reported as the average.
 
-The obvious response is to poll faster. It does not work, and the data says so: across 13,047
-capture failures, the exact rung we had taken was still quoted in **zero** of them, and only 0.41%
-had two-sided rungs on both sides to interpolate between. The price is not being missed. It has
-stopped existing.
+The obvious response is to poll faster. It does not work, and the data says so: across 139,061
+logged capture failures, the exact rung we had taken was still quoted in **zero** of them, and of
+20,060 line-movement failures only 66 (0.33%) had two-sided rungs on both sides to interpolate
+between. The price is not being missed. It has stopped existing.
 
-**2. A randomised trial that was never randomised.**
-Arms looked balanced — 353 against 350 across nine days. The assignment was not stored; it was
-recomputed on read from an identity key built out of raw fields, and those fields drift. One
-position could draw two different assignments on two different reads. **51.7% of 9,074 assignments
-were irreproducible.** Every balance check the experiment passed was a check on the recomputation.
+Three failures sit on top of that, each of which left every dashboard green:
 
-**3. Population choice determines the sign.**
-Return on the positions the system acted on: **+1.60%**. Return on all positions it evaluated,
-including the 87% it declined: **−1.40%**. Same model, same window, same prices. The gate is not a
-neutral filter over a fixed population — it *creates* the population, so it cannot be evaluated on
-it. Both intervals cross zero once clustered by day; the finding is the sign change, not either
-number.
+**1. Population choice sets the sign.**
+Return on the positions the system acted on: **+2.19%**. Return on the positions it declined, 93% of
+everything it evaluated: **-2.24%**. Same model, same window, same prices. The gate is not a neutral
+filter over a fixed population; it *creates* the population, so it cannot be evaluated on it.
+Clustered by day, the acted-on interval crosses zero and the declined one does not. The finding is
+the sign change, not either number, and neither is offered as evidence of edge.
+
+**2. A filter that could never pass.**
+For 16 slate days, a category's minimum-edge bar sat above the largest edge the model is allowed to
+emit. Every one of 914 positions in what the system itself rated its best-measured segment was priced
+and declined; 181 sat pinned at the cap. Nothing errored. The rows were *demoted* rather than
+deleted, which is the only reason this can be counted at all.
+
+**3. A randomised trial that was never randomised.**
+A trial on the selection gate assigned arms by hashing raw row fields instead of the canonical
+identity. Raw fields drift between writers, so one bet could draw two assignments; in the shipped
+extract 356 of 10,804 bets carry more than one raw-field key. The assignment log was not retained,
+so the trial cannot be reconstructed from its own output, and no balance or effect figure from it is
+reported here.
 
 ---
 
@@ -50,11 +60,12 @@ python run_detectors.py    # the four detectors, pointed at the same data
 
 No network, no dependencies, no arguments. Python 3.8+.
 
-`reproduce.py` prints each value beside the value in the paper and marks any disagreement
-`MISMATCH`. It currently reports zero. If it ever reports one, **the paper is wrong, not the data** —
-that is the point of shipping it this way. The abstract's figures were first computed by hand and had
-silently drifted within six days, because settlement keeps landing on rows dated before the cutoff. A
-paper about measurement drifting from its own data is not one you want to submit with drift in it.
+`reproduce.py` prints each value beside the value in the paper, compared at zero tolerance, and
+marks any disagreement `MISMATCH`. It currently reports zero. If it ever reports one, **the paper is
+wrong, not the data**. That is the point of shipping it this way. An earlier freeze of this paper
+re-read the live store and drifted: late settlements kept landing on rows dated before the cutoff,
+and the headline ROI moved from +1.60% to +0.40% at an unchanged cutoff while every check stayed
+green. The extract here is the record; the store is never read again.
 
 `run_detectors.py` exits non-zero, and is supposed to. This data is the record of a system that broke
 these rules.
@@ -109,11 +120,37 @@ argument that these are properties of self-evaluating systems rather than lesson
 
 ---
 
+## The same detectors on clinical trial registration
+
+A second outside domain, sharing the structure and nothing else. Every trial on ClinicalTrials.gov is
+registered before its outcome is known, so the registry is a record of decisions proposed, not of
+results obtained: the reject-inference design this betting store had to be rebuilt to get.
+
+```bash
+py datasets/clinicaltrials/clinicaltrials.py   # reads the shipped sample; --refresh re-pulls it
+```
+
+The sample is the 40,000 most recent completed, terminated, withdrawn or suspended studies returned by
+the public API v2, cached so it does not move. Results are posted for **24.3% of 26,859 completed
+interventional trials**, and for **0 of 1,445 withdrawn** ones. Who ran the trial predicts whether an
+outcome exists at all: 52.4% for federal sponsors, 38.7% industry, 17.7% other, 3.5% other
+government.
+
+Stated as the script states it: four predictions were recorded before the first query returned and
+three held. The miss matters. Terminated trials post results *more* often than completed ones (39.3%),
+so absence here is not simply conditional on a bad ending. The withdrawn figure was found after
+scoring, not predicted, and a trial that never enrolled can have no outcome by construction. That is
+the point rather than a flaw: the registry keeps the withdrawn trial, which is the only reason its
+absence can be counted. The betting store originally kept only what it acted on.
+
+---
+
 ## What is in `data/`, and what is deliberately not
 
-Shipped: day index, sport, market class, whether the system acted, whether a close existed, whether
-the row was graded; per-day staked/returned totals; capture-failure reasons with the rung counts
-available at the time; salted identity token pairs.
+Shipped: day index, sport, whether the row is a player prop, whether the system acted, whether a
+close existed, whether the row was graded; per-day staked/returned totals; capture-failure reasons
+with the rung counts available at the time; salted identity token pairs; the best-segment rows with
+their tier and cap flags; the hypothesis registry reduced to sequence, kind and decision.
 
 Withheld: every player, game, team, book, market description, line, price, model probability and
 edge. Day indices are **relative** — day 0 is the first day of the window and nothing joins to a
@@ -131,8 +168,8 @@ declined ones, which is what makes result 3 measurable at all.
 
 ## A third domain: what a name fails to identify
 
-Result 2 is the paper's least independently checkable claim, because the 51.7% figure lives in a
-private store. The Chadwick Bureau register — a free third-party crosswalk between the player IDs
+The trial result is the paper's least independently checkable claim, because its assignment log did
+not survive. The Chadwick Bureau register — a free third-party crosswalk between the player IDs
 used by MLBAM, Retrosheet, Baseball-Reference and FanGraphs — lets anyone measure one component of
 the same mechanism. It exists *because* name-keying does not work, which makes its existence part
 of the evidence.
@@ -154,7 +191,7 @@ carry a diacritic**, and a collision needs two people to exist while a normalisa
 only one writer to fold accents and another not to. This project shipped that exact bug — a
 transaction check missed *Márquez* because it compared against *marquez*.
 
-**What this does not do.** It does not corroborate the 51.7% figure and is not offered as if it did.
+**What this does not do.** It does not measure the trial's own drift and is not offered as if it did.
 That failure was driven mainly by *other* mutable fields in the identity key — a market string
 respelled between writers, a line arriving as `None` on one path and `0.0` on another — with name
 handling only one contributor. This measures one component, on a different population, and it comes
@@ -175,13 +212,14 @@ and this work supplies evidence that a known problem persists rather than claimi
 
 ## Limitations, stated plainly
 
-The instrumentation postdates the system by roughly six weeks, so the window is what could be
-measured honestly, not the system's full history. Both ROI intervals cross zero under a
-day-clustered bootstrap; neither is evidence of edge, and the paper does not offer them as such. The
-detectors catch these failure shapes — they do not repair the underlying data, and a metric that was
-never defined cannot be recovered after the fact. Result 2's irreproducibility rate is measured on
-A/B assignments in the private store; the extract here carries the identity-drift pairs that caused
-it, which is a related but not identical figure, and `run_detectors.py` labels it as its own number.
+One operator, one pipeline, 72 pricing days (positions dated on or before 20 September 2026). The
+instrumentation postdates the system, so the window is what could be measured honestly, not the
+system's full history. The selection gates tightened during the window, so the declined share rose
+over it. The hypothesis registry began mid-window, so it counts the search from that point on. The
+acted-on ROI interval crosses zero under a day-clustered bootstrap; no ROI figure here is evidence
+of edge, and the paper does not offer one as such. The detectors catch these failure shapes; they do
+not repair the underlying data, and a metric that was never defined cannot be recovered after the
+fact.
 
 ---
 

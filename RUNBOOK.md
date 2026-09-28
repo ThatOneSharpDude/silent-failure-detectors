@@ -1,4 +1,10 @@
-# Freeze and submit — 20 September 2026
+# Freeze and submit
+
+**STATUS 2026-09-28:** frozen at CUTOFF 2026-09-20 (72 pricing days, store read 2026-09-28T04:57:57Z).
+`reproduce.py` reports 0 MISMATCH; the abstract is 491 words on the strict count. The abstract now
+cites this repository, so step 5 (publish) must happen BEFORE step 6 (submit). The private checker
+`nhl-betting/reproduce.py` no longer reads the live store: it runs this repo's `reproduce.py` and also
+fails if any frozen figure is missing from the abstract text.
 
 Everything below is mechanical. Budget 20 minutes.
 
@@ -31,11 +37,11 @@ reproducibility, application**. Finalists are additionally judged on interest / 
 
 The limit counts the title. Measured on `SSAC_ABSTRACT_final.md`:
 
-* **499 words** counting the results table
-* **451 words** not counting it (the table falls under the separate two-tables-or-figures allowance)
+* **491 words** counting the results table (2026-09-28 refreeze)
+* **440 words** not counting it (the table falls under the separate two-tables-or-figures allowance)
 
-Under the limit on either reading, so no trimming is needed. Re-measure after any Step 2 edits with
-the command in Step 3 — it is the stricter of the two counts.
+Re-measured after the 2026-09-20 refreeze: **491 with the table, 440 without.** Re-measure after
+any edit with the command in Step 3; it is the stricter of the two counts.
 
 ## 1. Refreeze the data (one constant)
 
@@ -72,7 +78,8 @@ capture-failure count. Two should NOT move:
 
 * **failures where our rung was still quoted** — this is zero, and it is the central claim. If it
   becomes non-zero, something real has changed and the paragraph needs rewriting, not editing.
-* **the declined share** — ~87%. A large move here means the gate's behaviour changed mid-window.
+* **the declined share** — 93% at the 09-20 freeze (87% at 08-24). It moved because the gates
+  tightened mid-window; that is stated in the README limitations.
 
 ## 3. Check the word count
 
@@ -93,7 +100,9 @@ Trim, do not append.
 ## 4. Sanity pass
 
 ```bash
-py run_detectors.py     # expect exit 1 with two ALARMs — that is correct
+py run_detectors.py | grep -c "\[ALARM\]"   # expect 2. Do NOT check the exit code:
+                                             # it is 1 by design AND 1 on a crash
+
 git status              # data/ should show modified CSVs and nothing else
 ```
 
@@ -124,7 +133,7 @@ Then verify the public view actually works for someone who is not you:
 ```bash
 cd /tmp && rm -rf sfd-check && git clone https://github.com/ThatOneSharpDude/silent-failure-detectors sfd-check
 cd sfd-check && py reproduce.py | grep -c MISMATCH   # expect 0
-py run_detectors.py > /dev/null; echo "exit=$?"       # expect 1
+py run_detectors.py | grep -c "\[ALARM\]"            # expect 2 (exit code cannot tell an alarm from a crash)
 ```
 
 A clone that cannot reproduce is worse than no repository, and this is the only way to catch a file

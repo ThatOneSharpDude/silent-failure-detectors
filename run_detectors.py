@@ -26,7 +26,7 @@ def rows(name):
 def main():
     pos, cf, idf, pnl = (rows("positions.csv"), rows("capture_failures.csv"),
                          rows("identity_drift.csv"), rows("daily_pnl.csv"))
-    props = [r for r in pos if r["market_class"] == "PROP"]
+    props = [r for r in pos if r["is_prop"] == "1"]
     out = []
 
     # RULE 2 first: every later finding is computed over these tables, so a silently empty one
