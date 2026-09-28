@@ -222,6 +222,21 @@ def write_trial(rows, didx, crf):
     return len(trial)
 
 
+def write_trial_control(rows, didx, crf):
+    """POSITIVE CONTROL for the trial audit. Epoch 2 (from 2026-08-24) keys the same coin on the
+    canonical identity with a formula that is known exactly. If re-hashing reproduces epoch 2 far
+    above chance, the audit machinery works and epoch 1's chance-level result belongs to its key."""
+    trial = [r for r in rows if r.get("rct_arm") in ("ARM_BET", "ARM_HOLD")
+             and int(r.get("rct_epoch") or 1) == 2]
+    fh, w = _writer("trial_epoch2_control.csv", ["day", "bet_token", "stored_arm", "match_known_formula"])
+    with fh:
+        for r in trial:
+            key = TRIAL_SALT + "|e2|" + "|".join(str(x) for x in crf.pick_identity(r))
+            w.writerow([didx[_date(r)], _tok("B", "|".join([_date(r)] + [str(x) for x in crf.pick_identity(r)])),
+                        r["rct_arm"], int(_coin(key) == r["rct_arm"])])
+    return len(trial)
+
+
 def copy_clinicaltrials():
     """The second external domain. Pure function of a cached, public ClinicalTrials.gov sample."""
     dst = os.path.join(HERE, "datasets", "clinicaltrials")
@@ -251,6 +266,7 @@ def main():
     n_seg = write_best_segment(rows, didx)
     n_reg = write_registry(snapshot)
     n_trial = write_trial(rows, didx, crf)
+    write_trial_control(rows, didx, crf)
     copy_clinicaltrials()
     print("trial epoch-1 positions: %d" % n_trial)
     print("capture failures logged by cutoff: %d   best segment rows: %d   registry tests: %d"

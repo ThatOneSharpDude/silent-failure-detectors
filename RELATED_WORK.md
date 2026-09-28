@@ -195,8 +195,9 @@ detection as experiment trust checks.
 **What we add:**
 
 1. A measurement of how often the closing price is *absent rather than noisy* in thin markets, with
-   the result that no polling rate recovers it — across 139,061 logged failures, zero occurred while
-   the wagered rung was still quoted.
+   the result that no polling rate recovers it — across 20,060 line-movement failures, zero occurred
+   while the wagered rung was still quoted, and in 119,001 more the player had no market at all; and
+   that the absence depends on the system's own decision within the same day.
 2. A production instance where aggregate experiment balance held and overlap checks were nearly
    clean while no unit's assignment could be re-derived from its own row — a failure that
    ratio-based and overlap-based monitoring cannot detect.

@@ -36,7 +36,11 @@ def main():
 
     # RULE 4: coverage of the closing price, stratified by whether the system acted. If the two
     # strata disagree, the missingness is related to the decision and the subset is not random.
-    out.append(monitor_for_absence(props, defined_key="has_close", floor=0.95, stratum_key="acted"))
+    # Restricted to days on which BOTH strata were recorded: before that the store kept only taken
+    # positions, so a spread computed across the boundary would partly measure the boundary.
+    days_both = {r["day"] for r in props if r["acted"] == "0"} & {r["day"] for r in props if r["acted"] == "1"}
+    props_both = [r for r in props if r["day"] in days_both]
+    out.append(monitor_for_absence(props_both, defined_key="has_close", floor=0.95, stratum_key="acted"))
 
     # RULE 3: does one bet ever carry two stored arms? This is the trial that cannot be audited.
     # Keyed on the bet (date + canonical identity), not on the raw fields: a raw key without a date

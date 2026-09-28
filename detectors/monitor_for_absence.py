@@ -6,13 +6,17 @@ metric therefore reports on a subset that selected itself, and the more often me
 healthier the surviving subset looks. There is no threshold to alert on, because nothing is out of
 range; the thing that is wrong is the denominator.
 
-SCAR. Closing-line value looked fine across the book. It was defined on 75.1% of prop positions and
-58.7% of the positions actually taken, and the missing rows were not random: a position is hardest
-to price at the close precisely when the market moved away from it. Of 139,061 capture failures, the
-rung we had taken was still quoted in ZERO of them, and only 0.33% had two-sided rungs on both sides
-to interpolate between. So the missingness is not a polling-rate problem with an engineering fix --
-the price does not exist to be captured. The metric was undefined, not noisy, and every average
-computed over it was an average over the easy cases.
+SCAR. Closing-line value looked fine across the book. It was defined on 75.1% of prop positions, and
+the missing rows were not random: on the same day, positions taken lacked a close 8.7 points less
+often than positions declined. Of 20,060 line-movement failures, the rung we had taken was still
+quoted in ZERO, and only 0.33% had two-sided rungs on both sides to interpolate between; in 119,001
+more the player had no market at all. So the missingness is not a polling-rate problem with an
+engineering fix -- the price does not exist to be captured. The metric was undefined, not noisy, and
+every average computed over it was an average over a subset the system itself selected.
+
+A WARNING ABOUT THIS DETECTOR'S OWN OUTPUT. The stratum spread it reports is pooled. When strata grow
+at different times, a pooled spread mixes time with the stratum and can even reverse sign. Treat an
+ALARM as "coverage depends on the stratum" and measure the size within a fixed time slice.
 
 THE RULE. Report coverage beside every aggregate, always, in the same breath. An aggregate whose
 coverage is not stated is not a result. And when coverage is low, test whether the missingness is

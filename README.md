@@ -24,10 +24,12 @@ dashboard can show you a wrong number. It cannot show you a number that is not t
 **The betting version.** Bettors judge skill with closing line value (CLV): did you get a better
 price than the market's final one? But on player props, books often pull a line before the game
 starts, so there is no closing price and no CLV for that bet. Here, 25% of prop positions had no
-closing price, and 41% of the bets actually taken. Lines disappear when the market moves away from
-your number, so the bets you cannot grade tend to be the ones that went wrong, and the average is
-taken over the easy cases. Collecting more data does not help: in 139,061 logged failures, the line
-that was bet was still being offered zero times. The price did not get missed. It stopped existing.
+closing price. Worse, whether a bet has one depends on what the system decided: on the same day, bets
+it took were missing a close 8.7 points less often than bets it passed on. So CLV is always computed
+on a hand-picked slice of the book, picked by the system itself. Collecting more data does not help.
+In 119,001 failures the player had no line at all. In the other 20,060 the line had moved, and the
+exact line that was bet was still on offer zero times. The price did not get missed. It stopped
+existing.
 
 **Three more things that broke without anyone noticing:**
 
@@ -42,7 +44,9 @@ that was bet was still being offered zero times. The price did not get missed. I
    nobody could quietly re-flip it until they liked the answer. But the coin was keyed on data that
    different parts of the code spell differently. Re-flipping each stored bet now matches its
    recorded side only 47-49% of the time, which is what a brand-new coin would do. The two sides
-   look perfectly balanced, and the test still cannot prove it was fair.
+   look perfectly balanced, and the test still cannot prove it was fair. The same check on the
+   corrected version of the test, keyed on a stable identity, matches 83.4%, so the check works and
+   the original key is what broke.
 
 **It is not a betting problem.** Run unchanged on federal mortgage data, the same detectors find an
 interest rate on 96.3% of approved loans and 0% of denied ones. On clinical trial registration,
@@ -82,15 +86,19 @@ guessing. An honest scoreboard makes even a mediocre model tell the truth about 
 ## The finding, and three failures
 
 **The metric is undefined, not merely noisy.**
-Closing-line value exists only where a closing price was captured: 75.1% of prop positions, and only
-58.7% of the positions actually taken. The missing rows are not random. A position is hardest to
-price at the close precisely when the market has moved away from it, so the average is taken over
-the easy cases and reported as the average.
+Closing-line value exists only where a closing price was captured: 75.1% of prop positions. The
+missing rows are not random with respect to the system's own decisions. Compared within the same day,
+positions taken lack a close **8.7 points less often** than positions declined (day-clustered 95%
+interval [-15.6, -1.4]). Pooled comparisons point either way depending on how they are weighted,
+because taken positions cluster early in the window, when capture was worse, and declined volume
+grew late, when it was better; the within-day comparison is the one that holds time fixed. Either
+way, CLV is computed on a subset the system selected.
 
-The obvious response is to poll faster. It does not work, and the data says so: across 139,061
-logged capture failures, the exact rung we had taken was still quoted in **zero** of them, and of
-20,060 line-movement failures only 66 (0.33%) had two-sided rungs on both sides to interpolate
-between. The price is not being missed. It has stopped existing.
+The obvious response is to poll faster. It does not work, and the data says so. Of 139,061 logged
+capture failures, 119,001 are a player with no market at all. In the other **20,060** the line had
+moved: the exact rung we had taken was still quoted in **zero** of them, and only 66 (0.33%) had
+two-sided rungs on both sides to interpolate between. The price is not being missed. It has stopped
+existing.
 
 Three failures sit on top of that, each of which left every dashboard green:
 
@@ -121,6 +129,13 @@ both arms. More damaging, re-hashing each frozen row reproduces its stored arm o
 time across every key construction we could reconstruct, which is the rate of a fresh coin. The arms
 were stamped on the rows, but no row can confirm its own assignment, so determinism, the property
 that made the trial evidence rather than an observational split, cannot be verified from its output.
+
+**The positive control.** A skeptic can fairly ask whether the audit, not the trial, is broken, since
+the original key construction was never recorded. So the same audit is run on epoch 2 of the same
+trial, which keyed the coin on the canonical identity with a formula that is known exactly: it
+reproduces **83.4%** of 3,738 stored arms, far above chance, and no bet sits in both arms. The audit
+works; epoch 1's key is what failed. That even the corrected epoch no longer reproduces fully, a month
+later, is itself a reason to store a decision rather than re-derive it (`data/trial_epoch2_control.csv`).
 
 `data/trial_epoch1.csv` carries the stored arm and one reproduces-or-not flag per key construction,
 so the range is checkable. The exact original construction was not recorded; that is part of the

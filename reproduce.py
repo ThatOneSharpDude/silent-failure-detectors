@@ -46,6 +46,10 @@ PAPER = {
     "bracketing_pct": "0.33",
     "logged": "139061",
     "still_quoted": "0",
+    "player_absent": "119001",
+    "linemoved_still_quoted": "0",
+    "within_day_gap": "8.7",
+    "within_day_gap_excludes_zero": "yes",
     "roi_acted": "+2.19",
     "roi_declined": "-2.24",
     "boundary_day": "12",
@@ -57,6 +61,9 @@ PAPER = {
     "trial_match_lo": "47",
     "trial_match_hi": "49",
     "trial_both_arms": "5",
+    "control_n": "3738",
+    "control_match_pct": "83.4",
+    "control_both_arms": "0",
     "segment_n": "914",
     "segment_bet": "0",
     "segment_days": "16",
@@ -114,8 +121,25 @@ def betting():
     check("prop rows with no closing price (%)", "prop_noclose_pct",
           pct(sum(1 for r in props if r["has_close"] == "0"), len(props)))
     taken = [r for r in props if r["acted"] == "1"]
-    check("... among positions taken (%)", "taken_noclose_pct",
+    check("... among positions taken, POOLED (%)", "taken_noclose_pct",
           pct(sum(1 for r in taken if r["has_close"] == "0"), len(taken)))
+    # The pooled figure is confounded by time: taken positions cluster early, when capture was worse,
+    # and declined volume exploded late, when it was better. Compare like with like: within each day
+    # holding both, taken minus declined, weighted by that day's taken count, bootstrapped by day.
+    byday = collections.defaultdict(lambda: {"t": [], "d": []})
+    for r in props:
+        byday[r["day"]]["t" if r["acted"] == "1" else "d"].append(r)
+    nc = lambda rs: sum(1 for r in rs if r["has_close"] == "0") / len(rs)
+    both = sorted((d for d, v in byday.items() if v["t"] and v["d"]), key=int)
+    diff = {d: (nc(byday[d]["t"]) - nc(byday[d]["d"]), len(byday[d]["t"])) for d in both}
+    wavg = lambda ds: 100.0 * sum(diff[d][0] * diff[d][1] for d in ds) / sum(diff[d][1] for d in ds)
+    gap = wavg(both)
+    check("within-day gap, taken lack a close LESS often by (pp)", "within_day_gap", "%.1f" % -gap)
+    rng = random.Random(0)
+    b = sorted(wavg([rng.choice(both) for _ in both]) for _ in range(2000))
+    lo, hi = b[50], b[1949]
+    print("  %-52s CI [%+.1f, %+.1f]" % ("... day-clustered 95% interval, taken minus declined", lo, hi))
+    check("... interval excludes zero", "within_day_gap_excludes_zero", "no" if lo <= 0 <= hi else "yes")
 
     cf = rows("capture_failures.csv")
     moved = [r for r in cf if r["why"] == "line-moved"]
@@ -124,6 +148,10 @@ def betting():
     check("... with bracketing two-sided rungs", "bracketing", str(brack))
     check("... as a share (%)", "bracketing_pct", pct(brack, len(moved), "%.2f"))
     check("capture failures logged in total", "logged", str(len(cf)))
+    check("... where the player had no market at all", "player_absent",
+          str(sum(1 for r in cf if r["why"] == "player-absent")))
+    check("line-moved failures where our rung WAS still quoted", "linemoved_still_quoted",
+          str(sum(1 for r in moved if r["our_rung_available"] == "1")))
     check("failures where our rung WAS still quoted", "still_quoted",
           str(sum(1 for r in cf if r["our_rung_available"] == "1")))
     print("       (that zero is the point: no polling rate recovers a price nobody is offering)")
@@ -181,6 +209,17 @@ def betting():
     check("... distinct bets that sit in BOTH arms", "trial_both_arms",
           str(sum(1 for v in arms.values() if len(v) > 1)))
     print("       (of %d distinct bets)" % len(arms))
+    # POSITIVE CONTROL. Epoch 2 keyed the same coin on the canonical identity with a known formula.
+    # Same audit, same machinery: if this reproduces far above chance, epoch 1's failure is its key.
+    ctl = rows("trial_epoch2_control.csv")
+    check("control: corrected epoch positions (n)", "control_n", str(len(ctl)))
+    check("control: re-hash reproduces stored arm (%)", "control_match_pct",
+          pct(sum(r["match_known_formula"] == "1" for r in ctl), len(ctl)))
+    carms = collections.defaultdict(set)
+    for r in ctl:
+        carms[r["bet_token"]].add(r["stored_arm"])
+    check("control: distinct bets in BOTH arms", "control_both_arms",
+          str(sum(1 for v in carms.values() if len(v) > 1)))
 
 
 def external():
