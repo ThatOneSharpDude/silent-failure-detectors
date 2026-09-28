@@ -12,7 +12,7 @@ else — different data, different regulator, different century of practice.
 THE STRUCTURE BEING TESTED, stated in the paper's own terms:
 
     record the decision taken   a store that keeps only the positions TAKEN cannot see the ones
-                                declined, and the declined ones are 87% of our own evidence
+                                declined, and the declined ones are 93% of our own evidence
     monitor for absence         an outcome that is ABSENT rather than noisy, where absence is
                                 conditional on the decision, so no amount of sampling recovers it
 

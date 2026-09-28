@@ -36,7 +36,7 @@ to offer it. The relevant quantity is therefore not whether the close is efficie
 where the answer is trivially yes.
 
 This is a scope difference, not a disagreement. We take the closing line's status as a benchmark from
-this literature and ask what happens when the benchmark is absent on a third of the sample.
+this literature and ask what happens when the benchmark is absent on a quarter of the prop sample.
 
 ---
 
@@ -102,11 +102,12 @@ have the expected proportions and whether the assigned populations are statistic
 not ask whether a *given unit* would receive the same assignment if the assignment were derived
 again.
 
-Our failure passes both. The arms were balanced 591 to 572 across nine days — an SRM test would have
-returned clean, and a PSI check on the arm populations would have found them stable, because the
-defect was not in the ratio. The assignment function hashed mutable raw fields, so five bets landed
-in both arms, and re-hashing each stored row reproduces its arm only **47-49% of the time, the rate
-of a fresh coin**. Aggregate balance was preserved while per-unit assignment was unverifiable.
+Our failure passes both. The first version's arms were balanced 591 to 572 across nine days, so an
+SRM test would have returned clean, and a PSI check would have found the populations stable, because
+the defect was not in the ratio. Under the second version's exactly known formula, re-deriving every
+stored arm gives a step: all 2,480 arms stamped from 5 September re-derive, and the 1,258 stamped
+before match 50.6%, a coin flip, with nothing in the system recording what changed. Aggregate balance
+was preserved while per-unit assignment became unverifiable.
 
 **What is NOT ours.** Detecting a unit that sits in two arms is prior art: the Yahoo patent does it
 by log intersection, and our `record_the_decision` detector is the same check (it finds our five
@@ -114,8 +115,9 @@ bets). Deterministic hashing on a stable key is standard practice.
 
 **Our contribution here**, stated narrowly enough to defend: re-deriving each unit's assignment from
 the row it is stored on, and comparing, is a different check from both SRM and overlap detection.
-It is the one that exposes our failure. Overlap detection finds 5 of 1,158 bets; re-derivation shows
-that NO row can confirm its own arm (47-49% agreement, the rate of a coin), which is what removes the
+It is the one that exposes our failure. Overlap detection finds 5 of 1,158 bets in the first version
+and none in the second; re-derivation under a known formula shows that every arm stamped before a
+silent change on 5 September can no longer be verified from its row, which is what removes the
 experiment's defence against silent re-rolling. We exhibit a production instance where the ratio
 check and the overlap check both look nearly clean and the per-unit check does not. We found no
 published source that runs this check; if a reviewer knows one, that narrows the contribution to the
@@ -159,10 +161,11 @@ validation is the wrong shape for failures defined by *absence conditional on a 
 
 A note on scope discipline, because the temptation runs the other way.
 
-**Demonstration generalises; analogy does not.** Running the detectors unmodified on a second real
-dataset (HMDA) is evidence. Listing domains the argument *resembles* — insurance underwriting,
-revenue management, hiring, clinical trials — costs a sentence and buys nothing, because a reviewer
-correctly reads an undemonstrated analogy as an assertion.
+**Demonstration generalises; analogy does not.** Running the detectors unmodified on real outside
+datasets (HMDA, ClinicalTrials.gov) is evidence, and both are framed as validations on known cases:
+decision-dependent absence exists there by design, so the detectors must fire, and they do. Listing
+domains the argument merely *resembles* (insurance underwriting, revenue management, hiring) buys
+nothing, because a reviewer correctly reads an undemonstrated analogy as an assertion.
 
 There is a specific downside too. The broader the claim, the more the work reads as a restatement of
 selection bias, which is textbook and nearly fifty years old. Breadth makes the contribution look
@@ -175,13 +178,12 @@ Recommended structure, at most three datasets, chosen so each exhibits a **diffe
 |---|---|---|
 | betting book | done | all four rules violated; the failures and their cost |
 | HMDA | done | rules 1 and 3 mandated by regulation; rule 4 fails structurally |
-| a third, TBD | open | ideally one where **rule 3 fails independently** |
+| ClinicalTrials.gov | done | rule 1 mandated (withdrawn trials retained); rule 4 fires on status |
 
-The third slot matters more than a fourth or fifth would, and for a specific reason: the trial
-result rests on one system's rows. Its stored arms and per-row reproduction flags now ship in the
-extract, so the figure is checkable, but it is still one instance. A public dataset exhibiting assignment or
-identity recomputation drift would move our weakest result onto independently checkable ground. Two
-more datasets that merely re-demonstrate rule 4 would not.
+Still open: a public dataset where **rule 3 fails independently**. The trial result rests on one
+system's rows; its stored arms and per-row reproduction flags ship in the extract, so it is
+checkable, but it is one instance. A public dataset exhibiting assignment or identity recomputation
+drift would move it onto independently checkable ground.
 
 ---
 

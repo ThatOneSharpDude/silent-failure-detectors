@@ -26,6 +26,7 @@ any result in it.
 """
 import collections
 import csv
+import math
 import os
 import random
 import sys
@@ -38,6 +39,8 @@ PAPER = {
     "positions": "17447",
     "pricing_days": "72",
     "declined_pct": "93",
+    "declined_pct_from_boundary": "95",
+    "prop_share_of_positions": "81",
     "prop_rows": "14104",
     "prop_noclose_pct": "24.9",
     "taken_noclose_pct": "41.3",
@@ -50,6 +53,10 @@ PAPER = {
     "linemoved_still_quoted": "0",
     "within_day_gap": "8.7",
     "within_day_gap_excludes_zero": "yes",
+    "sign_test_days_better": "39",
+    "sign_test_days": "60",
+    "sign_test_p": "0.03",
+    "player_absent_pct": "86",
     "roi_acted": "+2.19",
     "roi_declined": "-2.24",
     "boundary_day": "12",
@@ -64,6 +71,12 @@ PAPER = {
     "control_n": "3738",
     "control_match_pct": "83.4",
     "control_both_arms": "0",
+    "control_pre_n": "1258",
+    "control_pre_pct": "50.6",
+    "control_post_n": "2480",
+    "control_post_pct": "100.0",
+    "ct_detector_level": "ALARM",
+    "ct_detector_depends_on_status": "yes",
     "segment_n": "914",
     "segment_bet": "0",
     "segment_days": "16",
@@ -112,6 +125,12 @@ def betting():
     check("pricing days", "pricing_days", str(len({r["day"] for r in pos})))
     check("share the system declined (%)", "declined_pct",
           pct(sum(1 for r in pos if r["acted"] == "0"), len(pos), "%.0f"))
+    first_declined = min(int(r["day"]) for r in pos if r["acted"] == "0")
+    after = [r for r in pos if int(r["day"]) >= first_declined]
+    check("... declined share once declines were recorded (%)", "declined_pct_from_boundary",
+          pct(sum(1 for r in after if r["acted"] == "0"), len(after), "%.0f"))
+    check("player-prop share of all positions (%)", "prop_share_of_positions",
+          pct(sum(1 for r in pos if r["is_prop"] == "1"), len(pos), "%.0f"))
     reg = rows("registry.csv")
     check("tests in the append-only registry", "registry", str(len(reg)))
 
@@ -140,6 +159,20 @@ def betting():
     lo, hi = b[50], b[1949]
     print("  %-52s CI [%+.1f, %+.1f]" % ("... day-clustered 95% interval, taken minus declined", lo, hi))
     check("... interval excludes zero", "within_day_gap_excludes_zero", "no" if lo <= 0 <= hi else "yes")
+    # The SIZE depends on how days are weighted, so it is not the headline. What survives every
+    # weighting is the DIRECTION on most days: a sign test over days, which needs no weights at all.
+    eq = 100.0 * sum(diff[d][0] for d in both) / len(both)
+    dw = 100.0 * (sum(diff[d][0] * len(byday[d]["d"]) for d in both)
+                  / sum(len(byday[d]["d"]) for d in both))
+    print("  %-52s taken-weighted %+.1f | equal days %+.1f | declined-weighted %+.1f"
+          % ("... sensitivity of the gap to weighting (pp)", gap, eq, dw))
+    nz = [diff[d][0] for d in both if diff[d][0] != 0]
+    better = sum(1 for x in nz if x < 0)
+    k = min(better, len(nz) - better)
+    p_sign = min(1.0, 2.0 * sum(math.comb(len(nz), i) for i in range(k + 1)) / 2 ** len(nz))
+    check("days on which taken positions were better covered", "sign_test_days_better", str(better))
+    check("... out of days with both populations", "sign_test_days", str(len(nz)))
+    check("... two-sided sign test p", "sign_test_p", "%.2f" % p_sign)
 
     cf = rows("capture_failures.csv")
     moved = [r for r in cf if r["why"] == "line-moved"]
@@ -148,15 +181,18 @@ def betting():
     check("... with bracketing two-sided rungs", "bracketing", str(brack))
     check("... as a share (%)", "bracketing_pct", pct(brack, len(moved), "%.2f"))
     check("capture failures logged in total", "logged", str(len(cf)))
-    check("... where the player had no market at all", "player_absent",
-          str(sum(1 for r in cf if r["why"] == "player-absent")))
-    check("line-moved failures where our rung WAS still quoted", "linemoved_still_quoted",
+    n_absent = sum(1 for r in cf if r["why"] == "player-absent")
+    check("... where the player had no market at all", "player_absent", str(n_absent))
+    check("... as a share of failed captures (%)", "player_absent_pct", pct(n_absent, len(cf), "%.0f"))
+    print("       (failed captures are POLLING EVENTS, not positions: one position can fail many times)")
+    check("line-moved failures where our rung WAS still quoted (0 by construction)", "linemoved_still_quoted",
           str(sum(1 for r in moved if r["our_rung_available"] == "1")))
-    check("failures where our rung WAS still quoted", "still_quoted",
+    check("failures where our rung WAS still quoted (0 by construction)", "still_quoted",
           str(sum(1 for r in cf if r["our_rung_available"] == "1")))
-    print("       (that zero is the point: no polling rate recovers a price nobody is offering)")
+    print("       (a failure is only logged when the rung is absent, so this zero is a definition,")
+    print("        not a finding; it is shown so no one mistakes it for one)")
 
-    print("\nRESULTS - a population boundary sets the sign")
+    print("\nRESULTS - unmatched windows")
     pnl = rows("daily_pnl.csv")
     # The store recorded O\nY positions taken until declined rows first appear. Any pooled figure
     # spans that boundary, so it is computed both ways.
@@ -185,8 +221,13 @@ def betting():
     check("... slate days", "segment_days", str(len({r["day"] for r in seg})))
     print("       pinned at the shrink cap: %d  (the bar sat above the highest edge the model can emit)"
           % sum(1 for r in seg if r["pinned_at_shrink_cap"] == "1"))
+    # From the system's configuration at the time, not from this data (edges are withheld):
+    # a pick needed edge x eff_mult x cal_mult >= min_edge, and edge is capped at 13.0pp.
+    cap, eff, cal, bar = 13.0, 0.90, 0.981, 12.0
+    print("       configuration: best reachable %.1f x %.2f x %.3f = %.2f < bar %.1f  (unreachable)"
+          % (cap, eff, cal, cap * eff * cal, bar))
 
-    print("\nRESULTS - the experiment that was silently not one")
+    print("\nRESULTS - a trial that cannot be audited")
     tr = rows("trial_epoch1.csv")
     check("trial epoch-1 positions (n)", "trial_n", str(len(tr)))
     check("... days it ran", "trial_days", str(len({r["day"] for r in tr})))
@@ -202,7 +243,8 @@ def betting():
           "%.0f" % min(rates.values()))
     check("... highest reproduction rate across key constructions", "trial_match_hi",
           "%.0f" % max(rates.values()))
-    print("       a fresh coin would reproduce 50%: the assignment cannot be audited from its row")
+    print("       the original key was not recorded, so these only show that NO reconstruction re-derives")
+    print("       the arms; the control below, whose formula IS known, is the evidence that matters")
     arms = collections.defaultdict(set)
     for r in tr:
         arms[r["bet_token"]].add(r["stored_arm"])
@@ -215,6 +257,17 @@ def betting():
     check("control: corrected epoch positions (n)", "control_n", str(len(ctl)))
     check("control: re-hash reproduces stored arm (%)", "control_match_pct",
           pct(sum(r["match_known_formula"] == "1" for r in ctl), len(ctl)))
+    step = min(int(r["day"]) for r in ctl if all(x["match_known_formula"] == "1"
+                                                   for x in ctl if int(x["day"]) >= int(r["day"])))
+    pre = [r for r in ctl if int(r["day"]) < step]
+    post = [r for r in ctl if int(r["day"]) >= step]
+    print("  %-52s day %d  (every arm from here on re-derives)" % ("control: the step", step))
+    check("control: arms stamped BEFORE the step (n)", "control_pre_n", str(len(pre)))
+    check("control: ... re-derive (%)", "control_pre_pct",
+          pct(sum(r["match_known_formula"] == "1" for r in pre), len(pre)))
+    check("control: arms stamped FROM the step (n)", "control_post_n", str(len(post)))
+    check("control: ... re-derive (%)", "control_post_pct",
+          pct(sum(r["match_known_formula"] == "1" for r in post), len(post)))
     carms = collections.defaultdict(set)
     for r in ctl:
         carms[r["bet_token"]].add(r["stored_arm"])
@@ -243,6 +296,16 @@ def external():
     ctrows = ct.load()
     s = ct.analyse(ctrows)
     wd = [r for r in ctrows if r.get("study_type") == "INTERVENTIONAL" and r.get("status") == "WITHDRAWN"]
+    sys.path.insert(0, HERE)
+    import io as _io
+    import contextlib as _cl
+    import run_detectors_clinicaltrials as rdc
+    with _cl.redirect_stdout(_io.StringIO()):
+        found = {f.detector: f for f in rdc.findings(ctrows)}
+    mfa = found["monitor_for_absence"]
+    check("clinical trials: monitor_for_absence, unmodified", "ct_detector_level", mfa.level)
+    check("... flags coverage depending on trial status", "ct_detector_depends_on_status",
+          "yes" if "depends on status" in str(mfa.detail.get("note", "")) else "no")
     check("trials sampled (n)", "ct_n", str(s["n_total"]))
     check("results posted, completed interventional (%)", "ct_completed_pct",
           "%.1f" % s["interv_completed_rate"])

@@ -5,12 +5,13 @@ recomputes the decision on read. The recomputation is a different function than 
 code changed, a lookup table moved, a name normalised differently. So the record of what happened is
 reconstructed from what would happen now, and the two quietly disagree.
 
-SCAR. A randomised trial on a selection gate ran for nine days over 1,163 positions (591 to 572).
-Its coin was deterministic by design, a hash of the position's identity, so it could never be
-silently re-rolled. The arm WAS written onto each row. But the hash was taken over raw fields that
-different writers spell differently, so five bets landed in both arms, and re-hashing each row now
-reproduces its stored arm 47-49% of the time: the rate of a fresh coin. Storing the decision is what
-made the trial measurable at all; hashing an unstable key is what made it unauditable.
+SCAR. A randomised trial on a selection gate stamped each arm with a deterministic coin, a hash of the
+position's identity, so any assignment could be audited by re-deriving it. The arm WAS written onto
+each row, which is the only reason what follows is measurable. Re-deriving every stored arm with the
+coin's exactly known formula gives a step: all 2,480 arms stamped from 5 September re-derive, and the
+1,258 stamped before match 50.6%, a coin flip. Something changed that nothing records, and every
+earlier assignment became unverifiable from its own row. An earlier version keyed on raw fields also
+put five bets in both arms, which is what this detector finds.
 
 THE RULE. Write the decision down, at the moment it is taken, next to the inputs. The inputs are for
 diagnosis. The stored decision is what actually happened, and it is the only thing an audit can use.

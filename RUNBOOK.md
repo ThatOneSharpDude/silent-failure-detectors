@@ -1,7 +1,7 @@
 # Freeze and submit
 
 **STATUS 2026-09-28:** frozen at CUTOFF 2026-09-20 (72 pricing days, store read 2026-09-28T04:57:57Z).
-`reproduce.py` reports 0 MISMATCH; the abstract is 487 words on the strict count. Published
+`reproduce.py` reports 0 MISMATCH; the abstract is 479 words on the strict count (480 loose). Published
 2026-09-28. `data/trial_epoch1.csv` was added afterwards WITHOUT re-reading the store for the other
 files (their hashes were checked unchanged), because a re-read at the same cutoff drifts. The abstract now
 cites this repository, so step 5 (publish) must happen BEFORE step 6 (submit). The private checker
@@ -80,8 +80,8 @@ capture-failure count. Two should NOT move:
 
 * **failures where our rung was still quoted** — this is zero, and it is the central claim. If it
   becomes non-zero, something real has changed and the paragraph needs rewriting, not editing.
-* **the declined share** — 93% at the 09-20 freeze (87% at 08-24). It moved because the gates
-  tightened mid-window; that is stated in the README limitations.
+* **the declined share** — 93% at the 09-20 freeze (87% at 08-24). It moved because declines were not recorded before day 12 and later
+  volume grew mostly on the declined side; that is stated in the README limitations.
 
 ## 3. Check the word count
 
